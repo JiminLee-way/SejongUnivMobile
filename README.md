@@ -37,6 +37,16 @@ brand assets requires separate permission from Sejong University.
 - Community: notices, news, and boards in one browsing experience
 - MY Sejong: academic calendar, grades, notifications, and personal settings
 
+## Authentication and Portal API
+
+This project used
+[Sejong-University-Portal-Auth](https://github.com/JiminLee-way/Sejong-University-Portal-Auth)
+for Sejong University member authentication research and official portal API
+integration validation. The companion library is a TypeScript library based on
+the Sejong integrated app API and documents JWT authentication, structured JSON
+responses, mobile student ID QR generation, timetable access, notices, library
+seats, facility reservations, and other portal workflows.
+
 ## Screenshots
 
 <table>

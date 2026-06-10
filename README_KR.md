@@ -33,6 +33,15 @@
 - 커뮤니티: 공지, 뉴스, 게시판을 한 화면에서 탐색
 - MY 세종: 학사 캘린더, 성적, 알림 설정 등 개인화 메뉴
 
+## 인증 및 포털 API
+
+본 프로젝트는 세종대학교 구성원 인증과 공식 포털 API 연동 구조 검증에
+[Sejong-University-Portal-Auth](https://github.com/JiminLee-way/Sejong-University-Portal-Auth)를
+사용했습니다. 해당 companion library는 세종대학교 통합 앱 API를 기반으로
+한 TypeScript 라이브러리이며, JWT 인증, 구조화된 JSON 응답, 모바일
+학생증 QR 생성, 시간표 조회, 공지사항, 열람실, 시설 예약 등 포털
+워크플로우를 문서화하고 검증하는 데 활용되었습니다.
+
 ## 화면 미리보기
 
 <table>
