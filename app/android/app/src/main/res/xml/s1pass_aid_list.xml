@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  S1Pass HCE AID 등록 — 세종대 시설(도서관 출입게이트 등) NFC 리더가 사용하는
+  Application Identifier. 리더가 SELECT APDU를 보내면 OS가 이 AID를 등록한
+  서비스(S1PassHceService)로 라우팅한다.
+
+  AID = FF737070736A67 (ASCII "sppsjg")  — 공식 값, 변경 불가.
+  requireDeviceUnlock=false : 잠금 화면에서도 동작
+  requireDeviceScreenOn=false : 화면 꺼져 있어도 동작 (가장 핵심 — 가방에서
+                                폰 꺼내자마자 태깅 가능)
+-->
+<host-apdu-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/s1pass_nfc_description"
+    android:requireDeviceUnlock="false"
+    android:requireDeviceScreenOn="false">
+    <aid-group
+        android:description="@string/s1pass_aid_group_description"
+        android:category="other">
+        <aid-filter android:name="FF737070736A67" />
+    </aid-group>
+</host-apdu-service>

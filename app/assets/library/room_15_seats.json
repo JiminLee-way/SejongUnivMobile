@@ -1,0 +1,1190 @@
+{
+  "room_no": 15,
+  "name": "학술정보원 3F 제4열람실 A",
+  "canvas": {
+    "w": 965,
+    "h": 1441
+  },
+  "background_image": "assets/library/map_15.jpg",
+  "count": 146,
+  "bbox": {
+    "minX": 64,
+    "maxX": 930,
+    "minY": 71,
+    "maxY": 831
+  },
+  "summary": {
+    "occupied": 52,
+    "available": 94
+  },
+  "seats": [
+    {
+      "id": 1,
+      "x": 100,
+      "y": 790,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 2,
+      "x": 100,
+      "y": 747,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 3,
+      "x": 100,
+      "y": 704,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 4,
+      "x": 139,
+      "y": 704,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 5,
+      "x": 139,
+      "y": 747,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 6,
+      "x": 139,
+      "y": 790,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 7,
+      "x": 78,
+      "y": 623,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 8,
+      "x": 78,
+      "y": 580,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 9,
+      "x": 78,
+      "y": 534,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 10,
+      "x": 78,
+      "y": 491,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 11,
+      "x": 117,
+      "y": 491,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 12,
+      "x": 117,
+      "y": 534,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 13,
+      "x": 117,
+      "y": 580,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 14,
+      "x": 117,
+      "y": 623,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 15,
+      "x": 238,
+      "y": 790,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 16,
+      "x": 238,
+      "y": 747,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 17,
+      "x": 238,
+      "y": 704,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 18,
+      "x": 277,
+      "y": 704,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 19,
+      "x": 277,
+      "y": 747,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 20,
+      "x": 277,
+      "y": 790,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 21,
+      "x": 209,
+      "y": 623,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 22,
+      "x": 209,
+      "y": 580,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 23,
+      "x": 209,
+      "y": 534,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 24,
+      "x": 209,
+      "y": 491,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 25,
+      "x": 248,
+      "y": 491,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 26,
+      "x": 248,
+      "y": 534,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 27,
+      "x": 248,
+      "y": 580,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 28,
+      "x": 248,
+      "y": 623,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 29,
+      "x": 343,
+      "y": 623,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 30,
+      "x": 343,
+      "y": 580,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 31,
+      "x": 343,
+      "y": 534,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 32,
+      "x": 343,
+      "y": 491,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 33,
+      "x": 382,
+      "y": 491,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 34,
+      "x": 382,
+      "y": 534,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 35,
+      "x": 382,
+      "y": 580,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 36,
+      "x": 382,
+      "y": 623,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 37,
+      "x": 472,
+      "y": 790,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 38,
+      "x": 472,
+      "y": 747,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 39,
+      "x": 472,
+      "y": 704,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 40,
+      "x": 511,
+      "y": 704,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 41,
+      "x": 511,
+      "y": 747,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 42,
+      "x": 511,
+      "y": 790,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 43,
+      "x": 471,
+      "y": 623,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 44,
+      "x": 471,
+      "y": 580,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 45,
+      "x": 471,
+      "y": 534,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 46,
+      "x": 471,
+      "y": 491,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 47,
+      "x": 510,
+      "y": 491,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 48,
+      "x": 510,
+      "y": 534,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 49,
+      "x": 510,
+      "y": 580,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 50,
+      "x": 510,
+      "y": 623,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 51,
+      "x": 610,
+      "y": 790,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 52,
+      "x": 610,
+      "y": 747,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 53,
+      "x": 610,
+      "y": 704,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 54,
+      "x": 649,
+      "y": 704,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 55,
+      "x": 649,
+      "y": 747,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 56,
+      "x": 649,
+      "y": 790,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 57,
+      "x": 594,
+      "y": 623,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 58,
+      "x": 594,
+      "y": 580,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 59,
+      "x": 594,
+      "y": 534,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 60,
+      "x": 594,
+      "y": 491,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 61,
+      "x": 633,
+      "y": 491,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 62,
+      "x": 633,
+      "y": 534,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 63,
+      "x": 633,
+      "y": 580,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 64,
+      "x": 633,
+      "y": 623,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 65,
+      "x": 64,
+      "y": 381,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 66,
+      "x": 103,
+      "y": 381,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 67,
+      "x": 147,
+      "y": 381,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 68,
+      "x": 186,
+      "y": 381,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 69,
+      "x": 229,
+      "y": 381,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 70,
+      "x": 268,
+      "y": 381,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 71,
+      "x": 429,
+      "y": 381,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 72,
+      "x": 466,
+      "y": 381,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 73,
+      "x": 509,
+      "y": 381,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 74,
+      "x": 546,
+      "y": 381,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 75,
+      "x": 591,
+      "y": 381,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 76,
+      "x": 628,
+      "y": 381,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 77,
+      "x": 78,
+      "y": 295,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 78,
+      "x": 78,
+      "y": 252,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 79,
+      "x": 78,
+      "y": 209,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 80,
+      "x": 117,
+      "y": 209,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 81,
+      "x": 117,
+      "y": 252,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 82,
+      "x": 117,
+      "y": 295,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 83,
+      "x": 78,
+      "y": 114,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 84,
+      "x": 78,
+      "y": 71,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 85,
+      "x": 117,
+      "y": 71,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 86,
+      "x": 117,
+      "y": 114,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 87,
+      "x": 207,
+      "y": 295,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 88,
+      "x": 207,
+      "y": 252,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 89,
+      "x": 207,
+      "y": 209,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 90,
+      "x": 246,
+      "y": 209,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 91,
+      "x": 246,
+      "y": 252,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 92,
+      "x": 246,
+      "y": 295,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 93,
+      "x": 207,
+      "y": 114,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 94,
+      "x": 207,
+      "y": 71,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 95,
+      "x": 246,
+      "y": 71,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 96,
+      "x": 246,
+      "y": 114,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 97,
+      "x": 334,
+      "y": 295,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 98,
+      "x": 334,
+      "y": 252,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 99,
+      "x": 334,
+      "y": 209,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 100,
+      "x": 373,
+      "y": 209,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 101,
+      "x": 373,
+      "y": 252,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 102,
+      "x": 373,
+      "y": 295,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 103,
+      "x": 334,
+      "y": 114,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 104,
+      "x": 334,
+      "y": 71,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 105,
+      "x": 373,
+      "y": 71,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 106,
+      "x": 373,
+      "y": 114,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 107,
+      "x": 478,
+      "y": 295,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 108,
+      "x": 478,
+      "y": 252,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 109,
+      "x": 478,
+      "y": 209,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 110,
+      "x": 517,
+      "y": 209,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 111,
+      "x": 517,
+      "y": 252,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 112,
+      "x": 517,
+      "y": 295,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 113,
+      "x": 478,
+      "y": 114,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 114,
+      "x": 478,
+      "y": 71,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 115,
+      "x": 517,
+      "y": 71,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 116,
+      "x": 517,
+      "y": 114,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 117,
+      "x": 601,
+      "y": 295,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 118,
+      "x": 601,
+      "y": 252,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 119,
+      "x": 601,
+      "y": 209,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 120,
+      "x": 640,
+      "y": 209,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 121,
+      "x": 640,
+      "y": 252,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 122,
+      "x": 640,
+      "y": 295,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 123,
+      "x": 601,
+      "y": 114,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 124,
+      "x": 601,
+      "y": 71,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 125,
+      "x": 640,
+      "y": 71,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 126,
+      "x": 640,
+      "y": 114,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 127,
+      "x": 851,
+      "y": 790,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 128,
+      "x": 851,
+      "y": 747,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 129,
+      "x": 851,
+      "y": 704,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 130,
+      "x": 890,
+      "y": 704,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 131,
+      "x": 890,
+      "y": 747,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 132,
+      "x": 890,
+      "y": 790,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 133,
+      "x": 856,
+      "y": 623,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 134,
+      "x": 856,
+      "y": 580,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 135,
+      "x": 856,
+      "y": 534,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 136,
+      "x": 856,
+      "y": 491,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 137,
+      "x": 895,
+      "y": 491,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 138,
+      "x": 895,
+      "y": 534,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 139,
+      "x": 895,
+      "y": 580,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 140,
+      "x": 895,
+      "y": 623,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 141,
+      "x": 853,
+      "y": 355,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 142,
+      "x": 853,
+      "y": 312,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 143,
+      "x": 853,
+      "y": 269,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 144,
+      "x": 892,
+      "y": 269,
+      "w": 35,
+      "h": 41,
+      "status": "occupied"
+    },
+    {
+      "id": 145,
+      "x": 892,
+      "y": 312,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    },
+    {
+      "id": 146,
+      "x": 892,
+      "y": 355,
+      "w": 35,
+      "h": 41,
+      "status": "available"
+    }
+  ]
+}

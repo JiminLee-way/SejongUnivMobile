@@ -1,0 +1,87 @@
+name: Android internal APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build-debug-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Test
+        run: flutter test
+
+      - name: Build debug APK
+        run: |
+          flutter build apk --debug \
+            --dart-define=SEJONG_API_BASE_URL="${{ secrets.SEJONG_API_BASE_URL }}" \
+            --dart-define=SEJONG_WEB_BASE_URL="${{ secrets.SEJONG_WEB_BASE_URL }}" \
+            --dart-define=UCHECK_API_BASE_URL="${{ secrets.UCHECK_API_BASE_URL }}" \
+            --dart-define=LIBSEAT_BASE_URL="${{ secrets.LIBSEAT_BASE_URL }}" \
+            --dart-define=SJPT_BASE_URL="${{ secrets.SJPT_BASE_URL }}" \
+            --dart-define=HAPPYDORM_BASE_URL="${{ secrets.HAPPYDORM_BASE_URL }}" \
+            --dart-define=ANDROID_STORE_URL="${{ secrets.ANDROID_STORE_URL }}" \
+            --dart-define=UCHECK_USER_AGENT="${{ secrets.UCHECK_USER_AGENT }}" \
+            --dart-define=UCHECK_CLIENT_VERSION="${{ secrets.UCHECK_CLIENT_VERSION }}" \
+            --dart-define=UCHECK_DEVICE_MODEL="${{ secrets.UCHECK_DEVICE_MODEL }}" \
+            --dart-define=UCHECK_AES_IV="${{ secrets.UCHECK_AES_IV }}" \
+            --dart-define=UCHECK_DAILY_KEY_SALT="${{ secrets.UCHECK_DAILY_KEY_SALT }}" \
+            --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
+            --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}" \
+            --dart-define=SUPABASE_TABLE_01="${{ secrets.SUPABASE_TABLE_01 }}" \
+            --dart-define=SUPABASE_TABLE_02="${{ secrets.SUPABASE_TABLE_02 }}" \
+            --dart-define=SUPABASE_TABLE_03="${{ secrets.SUPABASE_TABLE_03 }}" \
+            --dart-define=SUPABASE_TABLE_04="${{ secrets.SUPABASE_TABLE_04 }}" \
+            --dart-define=SUPABASE_TABLE_05="${{ secrets.SUPABASE_TABLE_05 }}" \
+            --dart-define=SUPABASE_TABLE_06="${{ secrets.SUPABASE_TABLE_06 }}" \
+            --dart-define=SUPABASE_TABLE_07="${{ secrets.SUPABASE_TABLE_07 }}" \
+            --dart-define=SUPABASE_FUNCTION_01="${{ secrets.SUPABASE_FUNCTION_01 }}" \
+            --dart-define=SUPABASE_RPC_01="${{ secrets.SUPABASE_RPC_01 }}" \
+            --dart-define=SUPABASE_RPC_02="${{ secrets.SUPABASE_RPC_02 }}" \
+            --dart-define=SUPABASE_RPC_03="${{ secrets.SUPABASE_RPC_03 }}" \
+            --dart-define=SUPABASE_RPC_04="${{ secrets.SUPABASE_RPC_04 }}" \
+            --dart-define=SUPABASE_RPC_05="${{ secrets.SUPABASE_RPC_05 }}" \
+            --dart-define=SUPABASE_RPC_06="${{ secrets.SUPABASE_RPC_06 }}" \
+            --dart-define=SUPABASE_RPC_07="${{ secrets.SUPABASE_RPC_07 }}" \
+            --dart-define=SUPABASE_RPC_08="${{ secrets.SUPABASE_RPC_08 }}" \
+            --dart-define=SUPABASE_RPC_09="${{ secrets.SUPABASE_RPC_09 }}" \
+            --dart-define=SUPABASE_RPC_10="${{ secrets.SUPABASE_RPC_10 }}" \
+            --dart-define=SUPABASE_RPC_11="${{ secrets.SUPABASE_RPC_11 }}" \
+            --dart-define=SUPABASE_RPC_12="${{ secrets.SUPABASE_RPC_12 }}" \
+            --dart-define=SUPABASE_RPC_13="${{ secrets.SUPABASE_RPC_13 }}" \
+            --dart-define=SUPABASE_RPC_14="${{ secrets.SUPABASE_RPC_14 }}" \
+            --dart-define=SUPABASE_RPC_15="${{ secrets.SUPABASE_RPC_15 }}" \
+            --dart-define=SUPABASE_RPC_16="${{ secrets.SUPABASE_RPC_16 }}" \
+            --dart-define=SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sejong-univ-mobile-debug-apk
+          path: app/build/app/outputs/flutter-apk/app-debug.apk

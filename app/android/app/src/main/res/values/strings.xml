@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- S1Pass NFC HCE — 시스템 NFC 설정 화면에 노출되는 라벨 -->
+    <string name="s1pass_nfc_description">세종대 모바일 학생증 NFC 서비스</string>
+    <string name="s1pass_aid_group_description">세종대 출입 인증</string>
+</resources>

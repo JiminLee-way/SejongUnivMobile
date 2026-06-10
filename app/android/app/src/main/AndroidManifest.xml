@@ -1,0 +1,150 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- 네트워크 — UCheck/sjapp API 호출 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- open_filex가 끌어오는 미디어/외부저장소 권한 제거. 우리는 앱 전용 저장소에
+         받은 첨부만 FileProvider content URI로 열어 갤러리/미디어 접근이 불필요.
+         Play "사진 및 동영상 액세스" 선언을 피하려 manifest merge 단계에서 제거한다. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" tools:node="remove" />
+
+    <!-- UCheck BLE 비콘 스캔 — Android 12+(API 31)는 BLUETOOTH_SCAN/CONNECT 런타임.
+         neverForLocation 플래그로 위치 권한 우회 가능하지만 일부 비콘 신뢰성 위해
+         ACCESS_FINE_LOCATION도 같이 받는다. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- Android 13+(API 33) 알림 표시는 런타임 동의 필요 — V2 자동출석에 본격 사용 -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- 열람실 예약 종료 30분·5분 전 정시 알림 — 최대 4시간 뒤 만료라 Doze에서
+         inexact 알람이 지연되면 "5분 전"이 만료 후 뜰 수 있어 exact 알람 사용.
+         USE_EXACT_ALARM(API 33+, 설치 시 부여) + 구버전용 SCHEDULE_EXACT_ALARM.
+         flutter_local_notifications의 zonedSchedule(exactAllowWhileIdle)가 사용. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!-- BLE 없는 단말도 설치 가능. UCheck 화면 진입 시 안내 -->
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
+    <!-- S1Pass NFC HCE — 캠퍼스 출입 게이트 태깅 -->
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+    <uses-feature android:name="android.hardware.nfc.hce" android:required="false" />
+    <uses-permission android:name="android.permission.NFC" />
+    <!-- S1Pass ForegroundService — 앱 종료 후 HCE 응답 보장 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- 부팅 후 자동으로 S1Pass service 시작 (앱 안 켜도 작동) -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- 배터리 최적화 제한 없음(Doze 화이트리스트) — 앱 종료/잠금/백그라운드에서도
+         S1PassForegroundService가 killed 되지 않아야 NFC 출입이 항상 동작. 없으면
+         OS가 절전을 위해 service를 종료해 앱 안 켜고 태깅이 실패한다. permission_handler의
+         Permission.ignoreBatteryOptimizations가 이 권한으로 시스템 다이얼로그를 띄움. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <application
+        android:label="세종대역"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <!-- Specifies an Android theme to apply to this Activity as soon as
+                 the Android process has started. This theme is visible to the user
+                 while the Flutter UI initializes. After that, this theme continues
+                 to determine the Window background behind the Flutter UI. -->
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <!-- Don't delete the meta-data below.
+             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+
+        <!-- S1Pass NFC HCE service — 시설 출입 게이트가 SELECT APDU 보내면
+             cardNo로 응답. exported=true + BIND_NFC_SERVICE 시스템 권한 필수. -->
+        <service
+            android:name=".nfc.S1PassHceService"
+            android:exported="true"
+            android:permission="android.permission.BIND_NFC_SERVICE">
+            <intent-filter>
+                <action android:name="android.nfc.cardemulation.action.HOST_APDU_SERVICE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.nfc.cardemulation.host_apdu_service"
+                android:resource="@xml/s1pass_aid_list" />
+        </service>
+
+        <!-- S1Pass ForegroundService — 앱 종료/잠금 상태에서도 HCE 응답
+             보장하기 위해 프로세스를 살려둠. type=connectedDevice. -->
+        <service
+            android:name=".nfc.S1PassForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <!-- 부팅 직후 자동으로 ForegroundService 시작 — 사용자가 앱을
+             안 켜도 NFC 태깅 작동. cardNo가 secure prefs에 있어야 동작. -->
+        <receiver
+            android:name=".nfc.S1PassBootReceiver"
+            android:exported="true"
+            android:enabled="true"
+            android:directBootAware="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
+    </application>
+    <!-- Required to query activities that can process text, see:
+         https://developer.android.com/training/package-visibility and
+         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
+
+         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- url_launcher: 외부 브라우저 / Custom Tabs / Play Store 위임 인텐트 -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="http"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="market"/>
+        </intent>
+        <!-- 교내 전화번호: tel: 다이얼러 (Android 11+ 패키지 가시성) -->
+        <intent>
+            <action android:name="android.intent.action.DIAL"/>
+            <data android:scheme="tel"/>
+        </intent>
+    </queries>
+</manifest>

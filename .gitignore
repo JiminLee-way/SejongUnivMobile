@@ -1,0 +1,49 @@
+# Local secrets and signing material
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+key.properties
+local.properties
+google-services.json
+GoogleService-Info.plist
+app/config/dart_defines.local.json
+
+# Local captures, reverse-engineering notes, and private docs
+wiki/
+docs/
+supabase/
+*.har
+.playwright-mcp/
+.mcp.json
+.codex/
+.antigravitycli/
+
+# Build outputs and caches
+build/
+.dart_tool/
+.gradle/
+node_modules/
+Pods/
+DerivedData/
+
+# Local backups / generated assets not required to build the app
+backups/
+asset/
+*.apk
+*.aab
+*.ipa
+*.symbols
+*.map.json
+
+# OS / editor
+.DS_Store
+.idea/
+*.iml
+.flutter-plugins-dependencies
+test_screenshot.png
+*.swp
+*.log

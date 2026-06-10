@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 이하 fallback splash. 단순 white — Android 12+에서는
+     windowSplashScreenBackground가 우선이라 이건 사실상 안 보임. -->
+<color xmlns:android="http://schemas.android.com/apk/res/android"
+       android:color="@android:color/white"/>

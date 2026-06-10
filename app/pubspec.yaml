@@ -1,0 +1,128 @@
+name: sejong_smart_campus
+description: "Sejong University unified mobile app - lightweight, offline-tolerant."
+publish_to: 'none'
+version: 1.0.5+5
+
+environment:
+  sdk: ^3.11.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  google_fonts: ^8.1.0
+  material_symbols_icons: ^4.2.1070
+  flutter_animate: ^4.5.2
+  flutter_riverpod: ^3.3.0
+
+  # 세종 통합앱 백엔드 직접 호출 — HTTP/쿠키/토큰 스택
+  dio: ^5.7.0
+  dio_cookie_manager: ^3.1.1
+  cookie_jar: ^4.0.8
+  flutter_secure_storage: ^9.2.4
+  path_provider: ^2.1.4
+
+  # (학생증 QR은 서버 /secureapi/qr/generate가 암호화 토큰을 PNG로 렌더해 돌려주므로
+  #  클라이언트 QR 렌더 라이브러리가 필요 없다 — qr_flutter 제거)
+
+  # 외부 핸드오프 (EXTERNAL_BROWSER / APPLINK fallback) — Custom Tabs는 platform native
+  url_launcher: ^6.3.1
+
+  # 공지 첨부파일 다운로드 후 OS 기본 앱에서 열기 (PDF/HWP/이미지 등).
+  # in-app dio.download → app docs dir → open_filex.openFile(path).
+  open_filex: ^4.5.0
+
+  # libseat (학술정보원 열람실) HTML scrape — JSON API가 없는 server-rendered PHP를
+  # native UI로 재해석하기 위해 DOM parsing 필요.
+  html: ^0.15.5
+  # libseat의 setSeat/returnSeat 응답이 XML — `<resultCode>`/`<resultMsg>`.
+  xml: ^6.5.0
+
+  # Supabase — 친구 시스템 + 암호화된 사용자 프로필/시간표 백업.
+  # 공개 소스에는 프로젝트 URL/key와 서버 스키마 이름을 넣지 않는다.
+  supabase_flutter: ^2.8.0
+
+  # UCheck (전자출결) 스택. 실제 호환 값은 dart-define으로 주입한다.
+  # crypto는 SHA256, encrypt는 AES wrapper. synchronized는 인증 관련
+  # 요청 직렬화에 사용한다.
+  crypto: ^3.0.6
+  encrypt: ^5.0.3
+  synchronized: ^3.3.0+3
+
+  # BLE 비콘 스캔 — 강의실 비콘(iBeacon 0x004C [0x02 0x15 ...]) 매칭.
+  # V1은 Foreground(앱 열고 버튼 누름)만 — flutter_blue_plus만으로 충분.
+  # V2 자동출석(앱 종료 상태 BLE 스캔 + AlarmManager + FGS)은 Kotlin native 필요.
+  flutter_blue_plus: ^1.34.5
+
+  # 런타임 권한 (BLUETOOTH_SCAN/CONNECT, ACCESS_FINE_LOCATION, POST_NOTIFICATIONS).
+  permission_handler: ^11.3.1
+
+  # 로컬 알림 — 강의 시작 10분 전 OS notification 예약 + 출석 결과 알림.
+  # flutter_local_notifications.zonedSchedule이 timezone 패키지 필요.
+  flutter_local_notifications: ^17.2.3
+  timezone: ^0.9.4
+  cached_network_image: ^3.4.1
+
+  # 안드로이드 홈 화면 스타일 reorderable grid — 바로가기 메뉴 편집(드래그-드롭
+  # reflow, ✕ 삭제, + 추가). Flutter SDK는 ReorderableListView(1D)만 제공하므로
+  # 2D 그리드 재정렬은 외부 패키지 필요.
+  flutter_reorderable_grid_view: ^5.3.0
+
+  # 미가입 친구에게 앱 추천 — OS 공유 시트로 초대 코드+스토어 링크 메시지 전송
+  # (친구 추가 화면의 "검색 결과 없음 → 앱 추천하기"). 실패 시 Clipboard 폴백.
+  share_plus: ^12.0.2
+  sentry_flutter: ^8.14.2
+  package_info_plus: ^9.0.1
+  device_info_plus: ^12.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.6
+
+# Native splash screen — 단색 cream 배경만 그리고 로고는 Flutter app splash
+# (_Bootstrapping)에서만 표시. system splash가 1024×1024 image를 각 density
+# 폴더에 그대로 복사해 화면 가로보다 큰 bitmap을 fill하다 좌상단부터 잘려
+# 보이던 버그를 회피. 두 splash가 모두 동일 단색 → 사용자는 한 화면처럼 인지.
+# `dart run flutter_native_splash:create`로 styles.xml과 drawable 다시 생성.
+flutter_native_splash:
+  color: "#F7F9FC"
+  color_dark: "#F7F9FC"
+  android_12:
+    color: "#F7F9FC"
+    color_dark: "#F7F9FC"
+
+# Public-safe app icon — `dart run flutter_launcher_icons`로 모든 mipmap/iOS
+# 사이즈 자동 생성. 공식 로고를 쓰지 않는 중립 마크만 포함한다.
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/icon/app_icon.png"
+  # Android 8+ adaptive icon — foreground는 중립 마크, background는 red 톤.
+  adaptive_icon_background: "#F4F6F9"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  min_sdk_android: 33
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/library/
+    - assets/icon/
+    - assets/legal/
+
+  fonts:
+    - family: Pretendard
+      fonts:
+        - asset: assets/fonts/Pretendard-Regular.otf
+          weight: 400
+        - asset: assets/fonts/Pretendard-Medium.otf
+          weight: 500
+        - asset: assets/fonts/Pretendard-SemiBold.otf
+          weight: 600
+        - asset: assets/fonts/Pretendard-Bold.otf
+          weight: 700

@@ -1,0 +1,15 @@
+# Release signing config — 실제 값으로 채워 `android/key.properties`로
+# **복사**하면 다음 release build부터 자동 sign. 이 template은 commit OK,
+# `key.properties` 본 파일은 .gitignore에 등록되어 있어 안전.
+#
+# keystore 생성:
+#   keytool -genkey -v -keystore ~/keystores/sejong-smart-campus.jks \
+#     -keyalg RSA -keysize 2048 -validity 10000 -alias sejong
+#
+# 빌드:
+#   flutter build appbundle --release --split-debug-info=build/symbols --obfuscate
+
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=sejong
+storeFile=/absolute/path/to/sejong-smart-campus.jks
