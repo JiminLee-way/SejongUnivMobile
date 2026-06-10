@@ -11,7 +11,8 @@ import 'package:sejong_smart_campus/features/notices/domain/entities/notice_mode
 ///
 /// 쿠키/Authorization이 필요 없는 첨부 URL을 stand-alone [Dio]로 다운로드한다.
 ///
-/// 저장 위치는 app docs dir 하위 `sejong_downloads/`. 같은 파일명이면 덮어쓰기.
+/// 저장 위치는 app docs dir 하위 `sejong_downloads/`. 같은 이름이 이미 있으면
+/// `name (1).ext` 형태로 새 파일명을 만든다.
 class NoticeAttachmentDownloader {
   NoticeAttachmentDownloader({Dio? dio})
     : _dio =
@@ -48,9 +49,7 @@ class NoticeAttachmentDownloader {
       return const DownloadResult(success: false, message: '파일 주소가 비어있어요');
     }
     try {
-      final dir = await _downloadsDir();
-      final safe = _sanitize(attachment.fileName);
-      final path = '${dir.path}/$safe';
+      final path = await _downloadPath(attachment);
       await _dio.download(
         attachment.fileUrl,
         path,
@@ -74,17 +73,8 @@ class NoticeAttachmentDownloader {
     NoticeAttachment attachment, {
     void Function(int received, int total)? onProgress,
   }) async {
-    final dir = await _downloadsDir();
-    final safe = _sanitize(attachment.fileName);
-    final path = '${dir.path}/$safe';
-    final existing = File(path);
-    DownloadResult dl;
-    if (await existing.exists() && await existing.length() > 0) {
-      dl = DownloadResult(success: true, savedPath: path);
-    } else {
-      dl = await download(attachment, onProgress: onProgress);
-      if (!dl.success) return dl;
-    }
+    final dl = await download(attachment, onProgress: onProgress);
+    if (!dl.success) return dl;
     final opened = await OpenFilex.open(dl.savedPath!);
     if (opened.type != ResultType.done) {
       return DownloadResult(
@@ -105,9 +95,58 @@ class NoticeAttachmentDownloader {
     return dir;
   }
 
+  Future<String> _downloadPath(NoticeAttachment attachment) async {
+    final dir = await _downloadsDir();
+    final safe = _sanitize(attachment.fileName);
+    return _availablePath(dir, safe);
+  }
+
   /// 파일명에 들어가면 안 되는 문자 제거. Android는 관대하지만 슬래시·콜론은 금지.
   String _sanitize(String name) {
-    return name.replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_').trim();
+    final sanitized = name
+        .replaceAll(RegExp(r'[\x00-\x1F\x7F\\/:*?"<>|]+'), '_')
+        .trim();
+    if (sanitized.isEmpty || sanitized == '.' || sanitized == '..') {
+      return 'attachment';
+    }
+    return _truncate(sanitized);
+  }
+
+  String _truncate(String name) {
+    const maxLength = 120;
+    if (name.length <= maxLength) return name;
+
+    final dot = name.lastIndexOf('.');
+    final hasExtension = dot > 0 && dot < name.length - 1;
+    if (!hasExtension) {
+      return name.substring(0, maxLength);
+    }
+
+    final extension = name.substring(dot);
+    final baseLimit = maxLength - extension.length;
+    if (baseLimit <= 0) {
+      return name.substring(0, maxLength);
+    }
+    return '${name.substring(0, baseLimit)}$extension';
+  }
+
+  Future<String> _availablePath(Directory dir, String fileName) async {
+    var candidate = '${dir.path}/$fileName';
+    if (!await File(candidate).exists()) return candidate;
+
+    final dot = fileName.lastIndexOf('.');
+    final hasExtension = dot > 0 && dot < fileName.length - 1;
+    final base = hasExtension ? fileName.substring(0, dot) : fileName;
+    final extension = hasExtension ? fileName.substring(dot) : '';
+
+    for (var i = 1; i < 1000; i++) {
+      final suffixed = _truncate('$base ($i)$extension');
+      candidate = '${dir.path}/$suffixed';
+      if (!await File(candidate).exists()) return candidate;
+    }
+
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    return '${dir.path}/${_truncate('$base ($timestamp)$extension')}';
   }
 }
 
