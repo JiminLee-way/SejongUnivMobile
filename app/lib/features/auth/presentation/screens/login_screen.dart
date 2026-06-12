@@ -8,6 +8,7 @@ import 'package:sejong_smart_campus/core/theme/app_tokens.dart';
 import 'package:sejong_smart_campus/core/theme/app_typography.dart';
 import 'package:sejong_smart_campus/features/auth/presentation/providers/auth_providers.dart';
 import 'package:sejong_smart_campus/features/legal/presentation/screens/privacy_policy_screen.dart';
+import 'package:sejong_smart_campus/shared/widgets/official_brand_logo.dart';
 
 /// 로그인 진입 화면.
 ///
@@ -209,11 +210,12 @@ class _BrandOverlay extends StatelessWidget {
     return Positioned.fill(
       child: Stack(
         children: [
-          // 베이스 빨간 톤 — primary alpha 0.78. 캠퍼스 사진을 brand tone으로 물들임.
+          // 베이스 빨간 톤. private asset overlay가 제공하는 실제 캠퍼스 사진이
+          // 묻히지 않도록 진한 브랜드 tint만 얹는다.
           Positioned.fill(
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.78),
+                color: AppColors.primary.withValues(alpha: 0.62),
               ),
             ),
           ),
@@ -225,10 +227,10 @@ class _BrandOverlay extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    AppColors.primary.withValues(alpha: 0.42),
-                    Colors.transparent,
                     AppColors.primary.withValues(alpha: 0.28),
-                    AppColors.primary.withValues(alpha: 0.55),
+                    Colors.transparent,
+                    AppColors.primary.withValues(alpha: 0.18),
+                    AppColors.primary.withValues(alpha: 0.46),
                   ],
                   stops: const [0.0, 0.35, 0.7, 1.0],
                 ),
@@ -244,7 +246,7 @@ class _BrandOverlay extends StatelessWidget {
                   radius: 1.1,
                   colors: [
                     Colors.transparent,
-                    Colors.black.withValues(alpha: 0.18),
+                    Colors.black.withValues(alpha: 0.12),
                   ],
                   stops: const [0.65, 1.0],
                 ),
@@ -273,13 +275,11 @@ class _CornerLogo extends StatelessWidget {
       child: IgnorePointer(
         child: Opacity(
           opacity: 0.22,
-          child: Image.asset(
-            'assets/images/app_mark.png',
+          child: OfficialBrandLogo(
             width: logoSize,
             height: logoSize,
             color: Colors.white,
             colorBlendMode: BlendMode.srcIn,
-            filterQuality: FilterQuality.high,
           ),
         ),
       ),
@@ -299,6 +299,8 @@ class _BrandText extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const _OfficialSeal(),
+          const SizedBox(height: 18),
           Text(
             'Sejong Univ',
             style: AppTypography.headlineLg.copyWith(
@@ -354,6 +356,35 @@ class _BrandText extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _OfficialSeal extends StatelessWidget {
+  const _OfficialSeal();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 62,
+      height: 62,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.94),
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.16),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: OfficialBrandLogo(
+        fit: BoxFit.contain,
+        fallbackColor: AppColors.primary,
+        fallbackColorBlendMode: BlendMode.srcIn,
       ),
     );
   }

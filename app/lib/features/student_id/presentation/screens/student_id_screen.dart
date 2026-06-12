@@ -19,6 +19,7 @@ import 'package:sejong_smart_campus/features/library/presentation/providers/libr
 import 'package:sejong_smart_campus/features/student_id/data/datasources/secure_screen.dart';
 import 'package:sejong_smart_campus/features/student_id/presentation/providers/student_id_providers.dart';
 import 'package:sejong_smart_campus/shared/widgets/glass_card.dart';
+import 'package:sejong_smart_campus/shared/widgets/official_brand_logo.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_refresh.dart';
 
 /// 학생증 화면.
@@ -274,8 +275,7 @@ class _IdCard extends StatelessWidget {
             right: -16,
             child: Opacity(
               opacity: 0.06,
-              child: Image.asset(
-                'assets/images/app_mark.png',
+              child: OfficialBrandLogo(
                 width: 140,
                 height: 140,
                 fit: BoxFit.contain,
@@ -299,8 +299,7 @@ class _IdCard extends StatelessWidget {
                   ),
                   const Spacer(),
                   // 세종대 로고 (우상단)
-                  Image.asset(
-                    'assets/images/app_mark.png',
+                  const OfficialBrandLogo(
                     width: 36,
                     height: 36,
                     fit: BoxFit.contain,

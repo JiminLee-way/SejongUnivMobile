@@ -7,6 +7,7 @@ import 'package:sejong_smart_campus/features/auth/presentation/screens/login_scr
 import 'package:sejong_smart_campus/features/home/presentation/providers/home_events_providers.dart';
 import 'package:sejong_smart_campus/features/push/presentation/providers/push_providers.dart';
 import 'package:sejong_smart_campus/features/shell/presentation/screens/app_shell.dart';
+import 'package:sejong_smart_campus/shared/widgets/official_brand_logo.dart';
 
 /// 앱 부트 직후 인증 상태에 따라 분기.
 ///
@@ -127,14 +128,7 @@ class _Bootstrapping extends StatelessWidget {
     // 보여서 transition 시 잔재나 점프 없음.
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Center(
-        child: Image.asset(
-          'assets/images/app_mark.png',
-          width: 173,
-          height: 173,
-          filterQuality: FilterQuality.high,
-        ),
-      ),
+      body: Center(child: OfficialBrandLogo(width: 173, height: 173)),
     );
   }
 }
