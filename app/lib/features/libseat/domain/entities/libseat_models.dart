@@ -8,9 +8,16 @@ class ReadingRoom {
   const ReadingRoom({
     required this.roomNo,
     required this.name,
-    required this.used,
-    required this.total,
-  });
+    required int used,
+    required int total,
+  }) : total = total < 0 ? 0 : total,
+       used = total <= 0
+           ? 0
+           : used < 0
+           ? 0
+           : used > total
+           ? total
+           : used;
 
   /// `seatMap.php?param_room_no=<roomNo>` query param에 그대로 사용.
   final int roomNo;
@@ -25,8 +32,32 @@ class ReadingRoom {
   final int total;
 
   int get free => (total - used).clamp(0, total);
-  double get usageRatio => total == 0 ? 0 : used / total;
+  double get usageRatio => total == 0 ? 0 : (used / total).clamp(0.0, 1.0);
 }
+
+/// "제1열람실A" / "제1열람실B"처럼 A/B로 분리된 실 room을
+/// 사용자에게 보여주는 base label("제1열람실")로 합산한다.
+List<ReadingRoom> mergeReadingRoomsByBase(List<ReadingRoom> rooms) {
+  final order = <String>[];
+  final byBase = <String, List<ReadingRoom>>{};
+  for (final room in rooms) {
+    final base = readingRoomBaseName(room.name);
+    if (!byBase.containsKey(base)) order.add(base);
+    byBase.putIfAbsent(base, () => []).add(room);
+  }
+  return [
+    for (final base in order)
+      ReadingRoom(
+        roomNo: byBase[base]!.first.roomNo,
+        name: base,
+        used: byBase[base]!.fold(0, (sum, room) => sum + room.used),
+        total: byBase[base]!.fold(0, (sum, room) => sum + room.total),
+      ),
+  ];
+}
+
+String readingRoomBaseName(String name) =>
+    name.replaceAll(RegExp(r'[A-Za-z]\s*$'), '').trim();
 
 /// 좌석 한 칸 상태.
 ///

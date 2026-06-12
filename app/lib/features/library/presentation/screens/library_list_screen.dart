@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
 import 'package:sejong_smart_campus/features/library/data/datasources/mock_library.dart';
+import 'package:sejong_smart_campus/features/libseat/domain/entities/libseat_models.dart'
+    as libseat;
 import 'package:sejong_smart_campus/features/libseat/presentation/providers/libseat_providers.dart';
 import 'package:sejong_smart_campus/features/library/domain/entities/library_models.dart';
 import 'package:sejong_smart_campus/core/routing/app_page_route.dart';
@@ -12,6 +14,7 @@ import 'package:sejong_smart_campus/shared/widgets/glass_card.dart';
 import 'package:sejong_smart_campus/shared/widgets/mesh_background.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_refresh.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_sub_app_bar.dart';
+import 'package:sejong_smart_campus/shared/widgets/shimmer.dart';
 import 'package:sejong_smart_campus/features/library/presentation/widgets/seat_card.dart';
 import 'package:sejong_smart_campus/features/library/presentation/screens/library_room_screen.dart';
 import 'package:sejong_smart_campus/features/library/presentation/screens/library_usage_history_screen.dart';
@@ -64,6 +67,7 @@ class _LibraryListScreenState extends ConsumerState<LibraryListScreen> {
         .where((r) => r.status == LibraryUsageStatus.unreturned)
         .length;
     final activeReservation = ref.watch(activeSeatReservationProvider);
+    final roomsAsync = ref.watch(roomListProvider);
     return Scaffold(
       backgroundColor: AppColors.surface,
       extendBodyBehindAppBar: true,
@@ -103,13 +107,7 @@ class _LibraryListScreenState extends ConsumerState<LibraryListScreen> {
                   const SizedBox(height: 16),
                   _SectionHeader(title: '열람실 선택', icon: Symbols.local_library),
                   const SizedBox(height: 10),
-                  for (final room in libraryRooms) ...[
-                    _RoomCard(
-                      room: room,
-                      onTap: () => _openRoom(context, room),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
+                  ..._roomCards(context, roomsAsync),
                   // 상단 _UsageHistoryEntryCard 하나로 진입 충분 — 하단
                   // 중복 "이용 내역" 섹션 제거. 전체 이력은 카드 탭 →
                   // _openHistory → LibraryUsageHistoryScreen.
@@ -120,6 +118,50 @@ class _LibraryListScreenState extends ConsumerState<LibraryListScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  List<Widget> _roomCards(
+    BuildContext context,
+    AsyncValue<List<libseat.ReadingRoom>> roomsAsync,
+  ) {
+    return roomsAsync.when(
+      loading: () => [
+        for (final room in libraryRooms) ...[
+          _RoomCard(
+            room: room,
+            loading: true,
+            onTap: () => _openRoom(context, room),
+          ),
+          const SizedBox(height: 12),
+        ],
+      ],
+      error: (_, _) => [
+        for (final room in libraryRooms) ...[
+          _RoomCard(
+            room: room,
+            hasError: true,
+            onTap: () => _openRoom(context, room),
+          ),
+          const SizedBox(height: 12),
+        ],
+      ],
+      data: (rooms) {
+        final summaries = {
+          for (final room in libseat.mergeReadingRoomsByBase(rooms))
+            room.name: room,
+        };
+        return [
+          for (final room in libraryRooms) ...[
+            _RoomCard(
+              room: room,
+              summary: summaries[room.shortLabel],
+              onTap: () => _openRoom(context, room),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ];
+      },
     );
   }
 }
@@ -348,17 +390,27 @@ class UsageHistoryRow extends StatelessWidget {
 }
 
 class _RoomCard extends StatelessWidget {
-  const _RoomCard({required this.room, required this.onTap});
+  const _RoomCard({
+    required this.room,
+    required this.onTap,
+    this.summary,
+    this.loading = false,
+    this.hasError = false,
+  });
 
   final LibraryRoom room;
   final VoidCallback onTap;
+  final libseat.ReadingRoom? summary;
+  final bool loading;
+  final bool hasError;
 
   @override
   Widget build(BuildContext context) {
-    final occupied = room.mockOccupied;
-    final total = room.totalCapacity;
-    final available = total - occupied;
-    final ratio = total == 0 ? 0.0 : occupied / total;
+    final occupied = summary?.used;
+    final total = summary?.total;
+    final available = summary?.free;
+    final ratio = summary?.usageRatio ?? 0.0;
+    final unavailable = !loading && summary == null;
 
     return Material(
       color: Colors.transparent,
@@ -402,36 +454,54 @@ class _RoomCard extends StatelessWidget {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        RichText(
-                          text: TextSpan(
-                            style: AppTypography.headlineMd.copyWith(
-                              fontSize: 14,
+                        if (loading)
+                          const Shimmer(
+                            child: ShimmerBox(width: 118, height: 24),
+                          )
+                        else if (unavailable)
+                          Text(
+                            hasError ? '현황을 불러오지 못했어요' : '현황 준비 중',
+                            style: AppTypography.labelMd.copyWith(
+                              color: AppColors.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
                             ),
-                            children: [
-                              TextSpan(
-                                text: '$available',
-                                style: TextStyle(
-                                  color: SeatStatus.available.color,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 24,
-                                ),
+                          )
+                        else
+                          RichText(
+                            text: TextSpan(
+                              style: AppTypography.headlineMd.copyWith(
+                                fontSize: 14,
                               ),
-                              TextSpan(
-                                text: ' 자리 비어있음',
-                                style: AppTypography.labelMd.copyWith(
-                                  color: AppColors.onSurfaceVariant,
+                              children: [
+                                TextSpan(
+                                  text: '$available',
+                                  style: TextStyle(
+                                    color: SeatStatus.available.color,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 24,
+                                  ),
                                 ),
-                              ),
-                            ],
+                                TextSpan(
+                                  text: ' 자리 비어있음',
+                                  style: AppTypography.labelMd.copyWith(
+                                    color: AppColors.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
                         const Spacer(),
-                        Text(
-                          '$occupied / $total',
-                          style: AppTypography.labelSm.copyWith(
-                            color: AppColors.onSurfaceVariant,
+                        if (loading)
+                          const Shimmer(
+                            child: ShimmerBox(width: 54, height: 12),
+                          )
+                        else if (occupied != null && total != null)
+                          Text(
+                            '$occupied / $total',
+                            style: AppTypography.labelSm.copyWith(
+                              color: AppColors.onSurfaceVariant,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -446,20 +516,27 @@ class _RoomCard extends StatelessWidget {
                                 color: AppColors.surfaceContainerHigh,
                               ),
                             ),
-                            FractionallySizedBox(
-                              alignment: Alignment.centerLeft,
-                              widthFactor: ratio.clamp(0.0, 1.0),
-                              child: Container(
-                                decoration: const BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      AppColors.primary,
-                                      AppColors.surfaceTint,
-                                    ],
+                            if (loading)
+                              const Positioned.fill(
+                                child: Shimmer(
+                                  child: ShimmerBox(radius: AppRadius.full),
+                                ),
+                              )
+                            else
+                              FractionallySizedBox(
+                                alignment: Alignment.centerLeft,
+                                widthFactor: ratio.clamp(0.0, 1.0),
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        AppColors.primary,
+                                        AppColors.surfaceTint,
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
                           ],
                         ),
                       ),

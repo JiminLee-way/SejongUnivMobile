@@ -167,15 +167,13 @@ class RoomData {
 
 /// 열람실 표시용 메타데이터 — 빠른 카드/탭 UI에서 사용.
 ///
-/// `mockOccupied` 는 시연용 — 실제 운영에서는 `/v1/library/rooms` polling으로
-/// 실시간 사용량을 받아온다.
+/// 실시간 사용량은 libseat `roomListProvider`가 제공한다. 이 모델은 navigation과
+/// asset 매핑에 필요한 정적 정보만 가진다.
 class LibraryRoom {
   const LibraryRoom({
     required this.roomNo,
     required this.name,
     required this.shortLabel,
-    required this.totalCapacity,
-    required this.mockOccupied,
     this.hasSeatMap = false,
   });
 
@@ -184,12 +182,6 @@ class LibraryRoom {
 
   /// "제1열람실A" 같은 짧은 라벨.
   final String shortLabel;
-
-  /// 시스템상의 총 정원.
-  final int totalCapacity;
-
-  /// 시연용 현재 사용 수.
-  final int mockOccupied;
 
   /// 좌석 좌표 + 배경 이미지 asset이 있는지 여부.
   ///

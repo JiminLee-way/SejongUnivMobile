@@ -200,19 +200,10 @@ class _LibraryRoomScreenState extends ConsumerState<LibraryRoomScreen> {
     List<libseat.ReadingRoom> rooms,
     String shortLabel,
   ) {
-    var used = 0;
-    var total = 0;
-    var found = false;
-    for (final r in rooms) {
-      // libseat name은 "제1열람실A", "제1열람실B" — 끝 영문 제거 후 매칭.
-      final base = r.name.replaceAll(RegExp(r'[A-Za-z]\s*$'), '').trim();
-      if (base == shortLabel) {
-        used += r.used;
-        total += r.total;
-        found = true;
-      }
+    for (final room in libseat.mergeReadingRoomsByBase(rooms)) {
+      if (room.name == shortLabel) return (room.used, room.total);
     }
-    return found ? (used, total) : null;
+    return null;
   }
 
   @override

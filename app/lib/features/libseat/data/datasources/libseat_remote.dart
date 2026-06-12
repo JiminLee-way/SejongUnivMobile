@@ -33,25 +33,53 @@ class LibseatRemote {
   final LibseatTokenSource tokenSource;
   final Dio _dio;
 
-  /// `GET /mobile/PA/seatRoomStatusListXML.php` → 8개 열람실 (공개·토큰 불필요).
+  /// `GET /mobile/MA/roomList.php?token=` → 8개 열람실.
   ///
-  /// 기존 `/mobile/MA/roomList.php`는 sjapp reading-room-token이 필요했고 jQuery/
-  /// Bootstrap server-rendered HTML을 regex로 긁어 셀렉터/문자열 변경에 취약했다.
-  /// PA(public area) 엔드포인트는 **인증 없이** jqGrid용 구조화 XML을 주므로
-  /// (a) 로그인/토큰 없이도 동작하고(홈 진입 즉시·계정 격리 토큰과 무관),
-  /// (b) strTotalSeat·strUseSeat 등 명시 필드라 파싱이 견고하다.
+  /// 공개 PA XML은 `strUseSeat`가 고정석을 포함해 모바일 화면의
+  /// `제1열람실A 58 / 87` 기준값과 달랐다. 사용자가 실제로 보는 모바일
+  /// roomList의 `<h5>제N열람실A used / total</h5>`를 SSOT로 사용한다.
   Future<List<ReadingRoom>> fetchRoomList() async {
+    final token = await tokenSource.getToken();
     final res = await _dio.get<String>(
-      '/mobile/PA/seatRoomStatusListXML.php',
-      queryParameters: const {
-        '_search': 'false',
-        'rows': '30',
-        'page': '1',
-        'sidx': '',
-        'sord': 'asc',
-      },
+      '/mobile/MA/roomList.php',
+      queryParameters: {'token': token},
     );
-    return parseRoomListXml(res.data ?? '');
+    return parseRoomListHtml(res.data ?? '');
+  }
+
+  /// 모바일 roomList HTML → [ReadingRoom] 목록. 순수 함수(테스트용).
+  ///
+  /// 구조:
+  /// `<a href="./seatMap.php?param_room_no=11&token=..."><h5>제1열람실A 59 / 87</h5>`.
+  /// token 값은 읽지 않고 `param_room_no`, h5 표시 텍스트만 파싱한다.
+  static List<ReadingRoom> parseRoomListHtml(String body) {
+    if (body.trim().isEmpty) return const [];
+    final doc = html_parser.parse(body);
+    final out = <ReadingRoom>[];
+    final roomRe = RegExp(r'param_room_no=(\d+)');
+    final labelRe = RegExp(r'^(.+?열람실\s*[A-Za-z]?)\s+(-?\d+)\s*/\s*(-?\d+)$');
+
+    for (final a in doc.querySelectorAll('a')) {
+      final href = a.attributes['href'] ?? '';
+      final roomNo = int.tryParse(roomRe.firstMatch(href)?.group(1) ?? '');
+      if (roomNo == null) continue;
+
+      final labelText = (a.querySelector('h5')?.text ?? a.text)
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      final m = labelRe.firstMatch(labelText);
+      if (m == null) continue;
+      final name = m.group(1)!.replaceAll(RegExp(r'\s+'), '').trim();
+      final used = int.tryParse(m.group(2)!);
+      final total = int.tryParse(m.group(3)!);
+      if (name.isEmpty || used == null || total == null || total <= 0) {
+        continue;
+      }
+      out.add(
+        ReadingRoom(roomNo: roomNo, name: name, used: used, total: total),
+      );
+    }
+    return out;
   }
 
   /// jqGrid XML → [ReadingRoom] 목록. 순수 함수(테스트용).

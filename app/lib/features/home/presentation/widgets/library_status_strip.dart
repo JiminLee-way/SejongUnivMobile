@@ -64,7 +64,7 @@ class _LibraryStatusStripState extends ConsumerState<LibraryStatusStrip> {
             loading: () => const _LoaderBox(),
             error: (_, _) => const _ErrorBox(),
             data: (list) {
-              final merged = _mergeABRooms(list);
+              final merged = mergeReadingRoomsByBase(list);
               if (merged.isEmpty) return const _EmptyBox();
               final pages = _chunk(merged, _rowsPerPage);
               return _Pager(
@@ -78,27 +78,6 @@ class _LibraryStatusStripState extends ConsumerState<LibraryStatusStrip> {
         ],
       ),
     );
-  }
-
-  /// `제1열람실A` + `제1열람실B`를 한 카드로 합산. base name(끝 영문 한 글자
-  /// 제거) 기준 그룹핑 + used/total 합. 첫 등장 순서 유지.
-  static List<ReadingRoom> _mergeABRooms(List<ReadingRoom> list) {
-    final order = <String>[];
-    final byBase = <String, List<ReadingRoom>>{};
-    for (final r in list) {
-      final base = r.name.replaceAll(RegExp(r'[A-Za-z]\s*$'), '').trim();
-      if (!byBase.containsKey(base)) order.add(base);
-      byBase.putIfAbsent(base, () => []).add(r);
-    }
-    return [
-      for (final base in order)
-        ReadingRoom(
-          roomNo: byBase[base]!.first.roomNo,
-          name: base,
-          used: byBase[base]!.fold(0, (s, r) => s + r.used),
-          total: byBase[base]!.fold(0, (s, r) => s + r.total),
-        ),
-    ];
   }
 
   static List<List<ReadingRoom>> _chunk(List<ReadingRoom> list, int size) {
