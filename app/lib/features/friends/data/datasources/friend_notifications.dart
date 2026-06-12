@@ -26,7 +26,7 @@ class FriendNotifications {
   /// main.dart에서 한 번 호출. 채널 등록 + 네이티브 plugin 보장.
   Future<void> init() async {
     if (_initialized) return;
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings('@drawable/ic_stat_app');
     const iosInit = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,

@@ -62,7 +62,7 @@ class UCheckNotifications {
     }
 
     // 2) plugin init — Android + iOS
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings('@drawable/ic_stat_app');
     const iosInit = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,

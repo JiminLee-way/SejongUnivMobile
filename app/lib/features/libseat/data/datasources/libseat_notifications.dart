@@ -44,7 +44,7 @@ class LibseatNotifications {
         '[LibseatNotifications] tz setLocalLocation 실패(UTC fallback): $e',
       );
     }
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings('@drawable/ic_stat_app');
     const iosInit = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,

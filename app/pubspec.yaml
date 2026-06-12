@@ -1,7 +1,7 @@
 name: sejong_smart_campus
 description: "Sejong University unified mobile app - lightweight, offline-tolerant."
 publish_to: 'none'
-version: 1.0.6+6
+version: 1.0.7+7
 
 environment:
   sdk: ^3.11.4
@@ -83,17 +83,16 @@ dev_dependencies:
   flutter_launcher_icons: ^0.14.4
   flutter_native_splash: ^2.4.6
 
-# Native splash screen — 단색 cream 배경만 그리고 로고는 Flutter app splash
-# (_Bootstrapping)에서만 표시. system splash가 1024×1024 image를 각 density
-# 폴더에 그대로 복사해 화면 가로보다 큰 bitmap을 fill하다 좌상단부터 잘려
-# 보이던 버그를 회피. 두 splash가 모두 동일 단색 → 사용자는 한 화면처럼 인지.
-# `dart run flutter_native_splash:create`로 styles.xml과 drawable 다시 생성.
+# Native splash screen. Public builds use the neutral public foreground; private
+# builds materialize the official foreground before running the generator.
 flutter_native_splash:
   color: "#F7F9FC"
   color_dark: "#F7F9FC"
+  image: "assets/icon/app_icon_foreground.png"
   android_12:
     color: "#F7F9FC"
     color_dark: "#F7F9FC"
+    image: "assets/icon/app_icon_foreground.png"
 
 # Public-safe app icon — `dart run flutter_launcher_icons`로 모든 mipmap/iOS
 # 사이즈 자동 생성. 공식 로고를 쓰지 않는 중립 마크만 포함한다.
