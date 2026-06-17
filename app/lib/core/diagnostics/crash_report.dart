@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -8,47 +9,46 @@ import 'package:sejong_smart_campus/core/diagnostics/app_log.dart';
 
 /// 앱의 **비정상 종료(크래시) 판별 + 진단 컨텍스트 영속화**.
 ///
-/// 비정상 vs 정상 종료 구분은 오직 **세션 sentinel**([_dirtyPath])로 한다:
-///  - [init]에서 `session.dirty` 파일을 동기 생성(= "세션 진행 중") 하고,
-///  - 앱이 **정상적으로 백그라운드로 전환**(`paused`/`hidden`)될 때
-///    [markSessionClean]이 그 파일을 지운다(= "깨끗이 끝남").
-///  - 다음 실행의 [init]에서 그 파일이 **아직 남아 있으면** → 직전 세션이 포그라운드
-///    도중 죽은 것 = **비정상 종료**([previousSessionUnclean]=true).
+/// 사용자에게 "직전 비정상 종료" 프롬프트를 띄우는 기준은 **Android가 기록한 실제
+/// 종료 사유**([ApplicationExitInfo])다. 예전처럼 `session.dirty` 파일만 보고
+/// 판단하면 정상 앱 종료, 최근 앱 제거, 앱 업데이트, `adb install -r` 같은 케이스도
+/// 크래시로 오탐된다.
 ///
-/// 왜 이 방식인가: 과거엔 [PlatformDispatcher.onError]가 한 번이라도 불리면 크래시로
-/// 간주해 다음 실행에 프롬프트를 띄웠다. 그러나 그 핸들러는 **앱이 살아남는 비동기
-/// 에러**(플러그인 PlatformException·네트워크 예외 등)에도 불리므로, 정상적으로 쓰고
-/// 닫아도 "예기치 않게 종료됐어요"가 뜨는 오탐의 근본 원인이었다. sentinel은 "프로세스가
-/// 포그라운드에서 죽었는가"라는 **진짜 종료 신호**만 본다. 스와이프로 앱을 닫아도 그 전에
-/// `paused`를 거치므로 정상 종료로 분류된다. 보너스: 네이티브 크래시(SIGSEGV/OOM/강제
-/// 종료)는 Dart 핸들러에 안 오지만 sentinel은 남으므로, 과거 방식이 못 잡던 것도 잡는다.
-///
-/// [persistSync]가 디스크에 남기는 에러 덤프([_path])는 이제 **트리거가 아니라 첨부용
-/// 컨텍스트**다 — 비정상 종료가 확정됐을 때 리포트에 붙인다(있으면). 인메모리 [AppLog]는
-/// 프로세스가 죽으면 사라지므로 핸들러는 **동기 write**만 한다(path_provider await 불가 대비).
+/// [persistSync]가 디스크에 남기는 에러 덤프([_path])와 `session.dirty`는
+/// **첨부/보조 컨텍스트**다. 프롬프트 트리거가 아니다.
 class CrashReport {
   CrashReport._();
   static final CrashReport instance = CrashReport._();
 
+  static const MethodChannel _diagnosticsChannel = MethodChannel(
+    'ac.sejong/diagnostics',
+  );
+
   String? _path;
   String? _dirtyPath;
-  bool _previousSessionUnclean = false;
+  String? _ackPath;
+  CrashEvidence? _previousCrashEvidence;
 
-  /// 직전 실행이 **깨끗하게(=백그라운드 진입) 끝나지 않았는지**. true면 비정상 종료
-  /// (포그라운드 도중 프로세스 사망: 네이티브 크래시/OOM/강제 종료/Dart 치명 에러).
-  /// [init]에서 1회 확정된다. release 빌드에서만 의미 있다(디버그 IDE-stop 오탐 회피).
-  bool get previousSessionUnclean => _previousSessionUnclean;
+  /// 직전 실행에서 사용자에게 알릴 만한 실제 crash/anr 증거. 없으면 프롬프트 금지.
+  CrashEvidence? get previousCrashEvidence => _previousCrashEvidence;
 
-  /// 부트스트랩에서 1회 — 덤프/sentinel 경로 확보 + **직전 세션 비정상 종료 판별** +
-  /// 이번 세션 dirty 마킹. 판별은 dirty 마킹보다 **먼저** 해야 한다(이번 마킹이
-  /// 직전 흔적을 덮어쓰기 전에 읽는다).
+  /// 호환용 getter. 새 코드는 [previousCrashEvidence]를 사용한다.
+  @Deprecated('Use previousCrashEvidence instead.')
+  bool get previousSessionUnclean => _previousCrashEvidence != null;
+
+  /// 부트스트랩에서 1회 — 덤프/sentinel 경로 확보 + Android 종료 사유 조회 +
+  /// 이번 세션 dirty 마킹. dirty 파일은 보조 컨텍스트이며 prompt 조건이 아니다.
   Future<void> init() async {
     try {
       final dir = await getApplicationSupportDirectory();
       _path = '${dir.path}/pending_crash.log';
       _dirtyPath = '${dir.path}/session.dirty';
+      _ackPath = '${dir.path}/last_crash_evidence_ack.txt';
       if (kReleaseMode) {
-        _previousSessionUnclean = File(_dirtyPath!).existsSync();
+        _previousCrashEvidence = await _loadPreviousCrashEvidence();
+        if (_previousCrashEvidence == null) {
+          _clearStaleCrashContextSync();
+        }
         _markDirtySync(); // 이번 세션 시작 — paused에서 markSessionClean()이 지운다.
       }
     } catch (_) {
@@ -62,6 +62,79 @@ class CrashReport {
     WidgetsBinding.instance.addObserver(_SessionLifecycleObserver());
   }
 
+  Future<CrashEvidence?> _loadPreviousCrashEvidence() async {
+    final acknowledgedUntilMillis = _readAcknowledgedUntilMillisSync();
+    final exits = await fetchRecentExitInfo();
+    return selectReportableEvidence(
+      exits,
+      acknowledgedUntilMillis: acknowledgedUntilMillis,
+    );
+  }
+
+  /// Android가 기록한 최근 process exit 이력을 가져온다. MethodChannel 실패는
+  /// prompt 비활성으로 처리해 오탐보다 누락을 선택한다.
+  Future<List<CrashEvidence>> fetchRecentExitInfo() async {
+    try {
+      final raw = await _diagnosticsChannel.invokeMethod<List<dynamic>>(
+        'getRecentExitInfo',
+      );
+      if (raw == null) return const [];
+      return raw
+          .whereType<Map<dynamic, dynamic>>()
+          .map(CrashEvidence.fromNativeMap)
+          .where((e) => e != null)
+          .cast<CrashEvidence>()
+          .toList(growable: false);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  @visibleForTesting
+  static CrashEvidence? selectReportableEvidence(
+    Iterable<CrashEvidence> exits, {
+    int? acknowledgedUntilMillis,
+  }) {
+    final sorted = exits.toList()
+      ..sort((a, b) => b.timestampMillis.compareTo(a.timestampMillis));
+    for (final exit in sorted) {
+      if (!exit.isReportable) continue;
+      if (acknowledgedUntilMillis != null &&
+          exit.timestampMillis <= acknowledgedUntilMillis) {
+        continue;
+      }
+      return exit;
+    }
+    return null;
+  }
+
+  int? _readAcknowledgedUntilMillisSync() {
+    final p = _ackPath;
+    if (p == null) return null;
+    try {
+      final f = File(p);
+      if (!f.existsSync()) return null;
+      return int.tryParse(f.readAsStringSync().trim());
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> acknowledgePreviousCrash() async {
+    final evidence = _previousCrashEvidence;
+    if (evidence == null) return;
+    _previousCrashEvidence = null;
+    final p = _ackPath;
+    if (p == null) return;
+    try {
+      final ackFile = File(p);
+      await ackFile.writeAsString(
+        evidence.timestampMillis.toString(),
+        flush: true,
+      );
+    } catch (_) {}
+  }
+
   void _markDirtySync() {
     final p = _dirtyPath;
     if (p == null) return;
@@ -70,9 +143,7 @@ class CrashReport {
     } catch (_) {}
   }
 
-  /// 정상 백그라운드 전환(`paused`/`hidden`) → 이 세션은 깨끗이 끝났다고 마킹.
-  /// 누적된 에러 덤프도 함께 비워, 다음에 첨부될 컨텍스트가 **이 세션 것만** 되게 한다.
-  void markSessionClean() {
+  void _clearStaleCrashContextSync() {
     try {
       final d = _dirtyPath;
       if (d != null) {
@@ -86,6 +157,10 @@ class CrashReport {
       }
     } catch (_) {}
   }
+
+  /// 정상 백그라운드 전환 → 이 세션은 깨끗이 끝났다고 마킹.
+  /// 누적된 에러 덤프도 함께 비워, 다음에 첨부될 컨텍스트가 **이 세션 것만** 되게 한다.
+  void markSessionClean() => _clearStaleCrashContextSync();
 
   /// 포그라운드 복귀(`resumed`) → 이 세션 동안 다시 크래시 가능하므로 dirty 재마킹.
   void markSessionActive() => _markDirtySync();
@@ -133,17 +208,89 @@ class CrashReport {
   }
 }
 
-/// 세션 sentinel을 라이프사이클에 묶는다 — paused/hidden(정상 백그라운드)에 clean,
-/// resumed(포그라운드 복귀)에 다시 dirty. AppShell의 옵저버와 별개로 전역에 등록돼
-/// 로그인 전 화면을 포함한 앱 수명 전체를 커버한다.
+@immutable
+class CrashEvidence {
+  const CrashEvidence({
+    required this.reason,
+    required this.reasonName,
+    required this.timestampMillis,
+    this.description,
+    this.importance,
+    this.status,
+    this.processName,
+  });
+
+  final int reason;
+  final String reasonName;
+  final int timestampMillis;
+  final String? description;
+  final int? importance;
+  final int? status;
+  final String? processName;
+
+  static CrashEvidence? fromNativeMap(Map<dynamic, dynamic> raw) {
+    final reason = _asInt(raw['reason']);
+    final timestamp = _asInt(raw['timestamp']);
+    if (reason == null || timestamp == null) return null;
+    return CrashEvidence(
+      reason: reason,
+      reasonName: raw['reasonName']?.toString() ?? 'REASON_$reason',
+      timestampMillis: timestamp,
+      description: raw['description']?.toString(),
+      importance: _asInt(raw['importance']),
+      status: _asInt(raw['status']),
+      processName: raw['processName']?.toString(),
+    );
+  }
+
+  static int? _asInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
+
+  String get id => '$timestampMillis:$reason:${processName ?? ''}';
+
+  bool get isReportable => switch (reasonName) {
+    'REASON_CRASH' ||
+    'REASON_CRASH_NATIVE' ||
+    'REASON_ANR' ||
+    'REASON_INITIALIZATION_FAILURE' => true,
+    _ => false,
+  };
+
+  String toReportLog() {
+    final at = DateTime.fromMillisecondsSinceEpoch(timestampMillis).toLocal();
+    final buffer = StringBuffer()
+      ..writeln('--- Android process exit info ---')
+      ..writeln('time=$at')
+      ..writeln('reason=$reasonName ($reason)');
+    final p = processName;
+    if (p != null && p.isNotEmpty) buffer.writeln('process=$p');
+    final d = description;
+    if (d != null && d.isNotEmpty) buffer.writeln('description=$d');
+    final i = importance;
+    if (i != null) buffer.writeln('importance=$i');
+    final s = status;
+    if (s != null) buffer.writeln('status=$s');
+    return buffer.toString().trimRight();
+  }
+}
+
+/// 세션 sentinel을 라이프사이클에 묶는다. sentinel은 prompt 조건이 아니라,
+/// 실제 crash/anr evidence가 있을 때 첨부할 보조 컨텍스트를 남기기 위한 장치다.
 class _SessionLifecycleObserver with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.hidden) {
-      CrashReport.instance.markSessionClean();
-    } else if (state == AppLifecycleState.resumed) {
-      CrashReport.instance.markSessionActive();
+    switch (state) {
+      case AppLifecycleState.resumed:
+        CrashReport.instance.markSessionActive();
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        CrashReport.instance.markSessionClean();
     }
   }
 }

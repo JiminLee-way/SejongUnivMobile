@@ -24,9 +24,7 @@
 
     <!-- 열람실 예약 종료 30분·5분 전 정시 알림 — 최대 4시간 뒤 만료라 Doze에서
          inexact 알람이 지연되면 "5분 전"이 만료 후 뜰 수 있어 exact 알람 사용.
-         USE_EXACT_ALARM(API 33+, 설치 시 부여) + 구버전용 SCHEDULE_EXACT_ALARM.
-         flutter_local_notifications의 zonedSchedule(exactAllowWhileIdle)가 사용. -->
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+         SCHEDULE_EXACT_ALARM은 사용자/시스템이 거부할 수 있어 코드에서 fallback 처리. -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <!-- BLE 없는 단말도 설치 가능. UCheck 화면 진입 시 안내 -->

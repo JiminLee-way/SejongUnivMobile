@@ -263,10 +263,20 @@ class LibseatRemote {
 
     // 활성 좌석 룸명 = '열람실'을 포함하는 .middle-card 텍스트.
     String? roomName;
+    DateTime? issuedDate;
     for (final mc in doc.querySelectorAll('.middle-card')) {
       final t = mc.text.trim();
       if (t.contains('열람실')) {
         roomName = t;
+        var card = mc.parent;
+        for (var depth = 0; card != null && depth < 4; depth++) {
+          final topCard = card.querySelector('.top-card');
+          if (topCard != null) {
+            issuedDate = _parseDateFromText(topCard.text);
+            break;
+          }
+          card = card.parent;
+        }
         break;
       }
     }
@@ -300,7 +310,18 @@ class LibseatRemote {
       startTime: times.isNotEmpty ? times[0] : '',
       endTime: times.length > 1 ? times[1] : '',
       extensionsUsed: extMatch != null ? int.parse(extMatch.group(1)!) : 0,
+      issuedDate: issuedDate,
       reserveNo: reserveNo,
+    );
+  }
+
+  static DateTime? _parseDateFromText(String text) {
+    final m = RegExp(r'(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})').firstMatch(text);
+    if (m == null) return null;
+    return DateTime(
+      int.parse(m.group(1)!),
+      int.parse(m.group(2)!),
+      int.parse(m.group(3)!),
     );
   }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,7 +11,6 @@ import 'package:sejong_smart_campus/features/libseat/domain/entities/libseat_mod
 import 'package:sejong_smart_campus/features/libseat/presentation/providers/libseat_providers.dart';
 import 'package:sejong_smart_campus/core/theme/app_tokens.dart';
 import 'package:sejong_smart_campus/core/theme/app_typography.dart';
-import 'package:sejong_smart_campus/features/shell/presentation/screens/app_shell.dart';
 import 'package:sejong_smart_campus/shared/widgets/glass_card.dart';
 import 'package:sejong_smart_campus/shared/widgets/mesh_background.dart';
 import 'package:sejong_smart_campus/features/library/presentation/widgets/seat_map.dart';
@@ -32,9 +33,14 @@ class LibraryRoomScreen extends ConsumerStatefulWidget {
 }
 
 class _LibraryRoomScreenState extends ConsumerState<LibraryRoomScreen> {
+  static const _minInitialLiveLoad = Duration(milliseconds: 300);
+
   late Future<RoomData> _roomFuture;
   int? _selectedSeatId;
+  int? _pendingReservationSeatId;
   bool _busy = false;
+  bool _initialLiveReady = false;
+  Object? _initialLiveError;
 
   /// 새로고침 진행 중 — 앱바 아이콘을 스피너로 바꿔 "진짜 갱신 중"임을 보여줌.
   bool _refreshing = false;
@@ -51,16 +57,64 @@ class _LibraryRoomScreenState extends ConsumerState<LibraryRoomScreen> {
       if (!mounted) return;
       _wingById = {for (final s in data.layout.seats) s.id: s.wing};
     });
-    // 진입 시점 강제 새로고침 — 사용자가 list 화면을 한참 켜놓고 들어와도
-    // 좌석맵·열람실 합산 모두 latest. ref.invalidate는 InheritedWidget을
-    // 건드리므로 initState 본문에서 직접 호출 시 framework 에러 발생.
-    // postFrameCallback로 첫 frame 직후에 실행 → 실 HTTP fetch
-    // (`GET /seatMap.php`, `GET /roomList.php`) 즉시 트리거. 첫 frame에 잠깐
-    // cached value 보이지만 16ms 뒤 새 fetch 결과로 교체.
+    // 진입 시점 강제 새로고침. 이전 provider AsyncData가 남아 있어도 첫 live
+    // fetch가 끝나기 전에는 skeleton만 보여 stale 좌석 색상 깜빡임을 막는다.
+    // ref.invalidate는 initState 본문에서 직접 호출할 수 없어 첫 frame 직후 실행.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _refresh();
+      unawaited(_loadInitialLive());
     });
+  }
+
+  void _invalidateLiveProviders() {
+    for (final rn in libseatRealRoomNos(widget.room.roomNo)) {
+      ref.invalidate(seatMapProvider(rn));
+    }
+    ref.invalidate(seatMapForRoomProvider(widget.room.roomNo));
+    ref.invalidate(roomListProvider);
+  }
+
+  Future<void> _waitInitialLoadFloor(DateTime startedAt) async {
+    final elapsed = DateTime.now().difference(startedAt);
+    if (elapsed >= _minInitialLiveLoad) return;
+    await Future<void>.delayed(_minInitialLiveLoad - elapsed);
+  }
+
+  Future<void> _loadInitialLive() async {
+    if (!mounted) return;
+    setState(() {
+      _initialLiveReady = false;
+      _initialLiveError = null;
+      _selectedSeatId = null;
+    });
+
+    final startedAt = DateTime.now();
+    _invalidateLiveProviders();
+    // ignore: avoid_print
+    print(
+      '[LIBSEAT] initial seatMap refresh room=${widget.room.roomNo} '
+      'reals=${libseatRealRoomNos(widget.room.roomNo)}',
+    );
+
+    try {
+      await Future.wait([
+        ref.read(seatMapForRoomProvider(widget.room.roomNo).future),
+        ref.read(roomListProvider.future),
+      ]);
+      await _waitInitialLoadFloor(startedAt);
+      if (!mounted) return;
+      setState(() {
+        _initialLiveReady = true;
+        _initialLiveError = null;
+      });
+    } catch (e) {
+      await _waitInitialLoadFloor(startedAt);
+      if (!mounted) return;
+      setState(() {
+        _initialLiveReady = false;
+        _initialLiveError = e;
+      });
+    }
   }
 
   /// 좌석맵 강제 새로고침 — 진입 시점 + 우측 상단 새로고침 버튼 공용 경로.
@@ -78,10 +132,7 @@ class _LibraryRoomScreenState extends ConsumerState<LibraryRoomScreen> {
       HapticFeedback.selectionClick();
       setState(() => _refreshing = true);
     }
-    for (final rn in libseatRealRoomNos(widget.room.roomNo)) {
-      ref.invalidate(seatMapProvider(rn));
-    }
-    ref.invalidate(roomListProvider);
+    _invalidateLiveProviders();
     // ignore: avoid_print
     print(
       '[LIBSEAT] seatMap refresh room=${widget.room.roomNo} '
@@ -150,11 +201,17 @@ class _LibraryRoomScreenState extends ConsumerState<LibraryRoomScreen> {
   void _onSeatTap(int id) {
     setState(() {
       _selectedSeatId = _selectedSeatId == id ? null : id;
+      if (_pendingReservationSeatId != id) {
+        _pendingReservationSeatId = null;
+      }
     });
   }
 
   void _dismissSheet() {
-    setState(() => _selectedSeatId = null);
+    setState(() {
+      _selectedSeatId = null;
+      _pendingReservationSeatId = null;
+    });
   }
 
   Future<void> _reserveSelectedSeat() async {
@@ -170,26 +227,14 @@ class _LibraryRoomScreenState extends ConsumerState<LibraryRoomScreen> {
       roomNo: realRoomNo,
       seatNo: '$id',
       roomName: widget.room.name,
+      visibleRoomNo: widget.room.roomNo,
     );
     if (!mounted) return;
     setState(() {
       _busy = false;
-      if (r.success) _selectedSeatId = null;
+      if (r.success) _pendingReservationSeatId = id;
     });
     await showLibseatResultDialog(context, r);
-    if (!mounted) return;
-    if (r.success) {
-      // 예약 완료 → 메인화면(홈 탭)으로 보냄. LibraryList/Room은 root navigator
-      // 위에 push된 풀스크린이라 popUntil(isFirst)로 AppShell을 드러낸다. 단
-      // AppShell의 inner 탭은 마지막 선택값(드로어로 비-홈 탭에서 진입 가능)이라
-      // popUntil만으로는 홈이 아닐 수 있음 → switchTab(0)으로 홈 강제(홈에서
-      // 왔으면 inner pop만 해 무해). 홈 열람실 카드는 seatOverride로 즉시 노출.
-      Navigator.of(
-        context,
-        rootNavigator: true,
-      ).popUntil((route) => route.isFirst);
-      AppShell.instance?.switchTab(0);
-    }
   }
 
   /// libseat roomList 응답에서 shortLabel(예: "제2열람실")과 일치하는 A/B 두
@@ -212,11 +257,14 @@ class _LibraryRoomScreenState extends ConsumerState<LibraryRoomScreen> {
     final bottomPad = MediaQuery.paddingOf(context).bottom;
     // libseat 실시간 좌석 상태 — asset 기본값과 merge.
     final liveAsync = ref.watch(seatMapForRoomProvider(widget.room.roomNo));
+    final activeReservation = ref.watch(activeSeatReservationProvider);
     // 헤더 게이지/숫자는 roomList의 합산 값 사용 (mock의 합산 roomNo는
     // seatMapProvider가 빈 list 반환할 수 있어 occupied=0으로 표시되는 버그
     // 회피). roomList loading/error 시는 좌석맵 occupied로 fallback.
     final roomListAsync = ref.watch(roomListProvider);
-    final summary = roomListAsync.value == null
+    final initialLiveLoading = !_initialLiveReady && _initialLiveError == null;
+    final initialLiveFailed = !_initialLiveReady && _initialLiveError != null;
+    final summary = !_initialLiveReady || roomListAsync.value == null
         ? null
         : _summaryFromRoomList(roomListAsync.value!, widget.room.shortLabel);
     return Scaffold(
@@ -240,21 +288,37 @@ class _LibraryRoomScreenState extends ConsumerState<LibraryRoomScreen> {
                 : null;
             final statuses = _mergeStatuses(
               base,
-              liveAsync.value ?? const [],
+              _initialLiveReady ? liveAsync.value ?? const [] : const [],
               expectedAvailable: expectedAvailable,
             );
             // 헤더 표시: roomList 합산값 우선 (정확). 없으면 좌석맵 fallback.
-            final headerTotal = summary?.$2 ?? layout.seats.length;
-            final headerOccupied = summary?.$1 ?? _occupiedOf(statuses);
-            final selectedSeat = _selectedSeatId == null
+            final headerTotal = _initialLiveReady
+                ? summary?.$2 ?? layout.seats.length
+                : 0;
+            final headerOccupied = _initialLiveReady
+                ? summary?.$1 ?? _occupiedOf(statuses)
+                : 0;
+            final selectedSeat = !_initialLiveReady || _selectedSeatId == null
                 ? null
                 : layout.seats.firstWhere(
                     (s) => s.id == _selectedSeatId,
                     orElse: () => layout.seats.first,
                   );
-            final selectedStatus = _selectedSeatId == null
+            final selectedStatus = !_initialLiveReady || _selectedSeatId == null
                 ? null
                 : (statuses[_selectedSeatId] ?? SeatStatus.unavailable);
+            final selectedRealRoomNo = _selectedSeatId == null
+                ? null
+                : resolveLibseatRoomNo(
+                    widget.room.roomNo,
+                    _wingById[_selectedSeatId],
+                  );
+            final selectedIsMine =
+                activeReservation?.seatNo == '$_selectedSeatId' &&
+                activeReservation?.roomNo == selectedRealRoomNo;
+            final selectedSyncPending =
+                _pendingReservationSeatId == _selectedSeatId &&
+                activeReservation == null;
             return Stack(
               children: [
                 Column(
@@ -276,6 +340,7 @@ class _LibraryRoomScreenState extends ConsumerState<LibraryRoomScreen> {
                           name: widget.room.name,
                           occupied: headerOccupied,
                           total: headerTotal,
+                          loading: !_initialLiveReady,
                         ),
                       ),
                     ),
@@ -290,12 +355,22 @@ class _LibraryRoomScreenState extends ConsumerState<LibraryRoomScreen> {
                         child: GlassCard(
                           padding: EdgeInsets.zero,
                           borderRadius: AppRadius.lg,
-                          child: SeatMap(
-                            layout: layout,
-                            statuses: statuses,
-                            selectedSeatId: _selectedSeatId,
-                            onSeatTap: _onSeatTap,
-                          ),
+                          child: initialLiveFailed
+                              ? _SeatMapLiveError(
+                                  error: _initialLiveError,
+                                  onRetry: _loadInitialLive,
+                                )
+                              : SeatMap(
+                                  layout: layout,
+                                  statuses: statuses,
+                                  selectedSeatId: _initialLiveReady
+                                      ? _selectedSeatId
+                                      : null,
+                                  loading: initialLiveLoading,
+                                  onSeatTap: _initialLiveReady
+                                      ? _onSeatTap
+                                      : null,
+                                ),
                         ),
                       ),
                     ),
@@ -303,8 +378,10 @@ class _LibraryRoomScreenState extends ConsumerState<LibraryRoomScreen> {
                 ),
                 _LibraryAppBar(
                   title: '열람실',
-                  refreshing: _refreshing,
-                  onRefresh: () => _refresh(showToast: true),
+                  refreshing: _refreshing || initialLiveLoading,
+                  onRefresh: initialLiveFailed
+                      ? () => _loadInitialLive()
+                      : () => _refresh(showToast: true),
                 ),
                 if (selectedSeat != null && selectedStatus != null)
                   Positioned(
@@ -314,6 +391,9 @@ class _LibraryRoomScreenState extends ConsumerState<LibraryRoomScreen> {
                     child: _SelectedSeatSheet(
                       seatId: selectedSeat.id,
                       status: selectedStatus,
+                      isMyReservedSeat: selectedIsMine,
+                      syncPending: selectedSyncPending,
+                      busy: _busy,
                       roomLabel: widget.room.name,
                       onDismiss: _dismissSheet,
                       onReserve: _reserveSelectedSeat,
@@ -322,6 +402,61 @@ class _LibraryRoomScreenState extends ConsumerState<LibraryRoomScreen> {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _SeatMapLiveError extends StatelessWidget {
+  const _SeatMapLiveError({required this.error, required this.onRetry});
+
+  final Object? error;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Symbols.warning, size: 32, color: AppColors.primary),
+            const SizedBox(height: 10),
+            Text(
+              '좌석 정보를 불러오지 못했어요',
+              style: AppTypography.bodyLg.copyWith(fontWeight: FontWeight.w700),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '네트워크 상태를 확인한 뒤 다시 시도해주세요.',
+              style: AppTypography.labelSm.copyWith(
+                color: AppColors.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 40,
+              child: ElevatedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Symbols.refresh, size: 18),
+                label: const Text('다시 불러오기'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.md),
+                  ),
+                  textStyle: AppTypography.labelMd.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -438,6 +573,9 @@ class _SelectedSeatSheet extends StatelessWidget {
   const _SelectedSeatSheet({
     required this.seatId,
     required this.status,
+    required this.isMyReservedSeat,
+    required this.syncPending,
+    required this.busy,
     required this.roomLabel,
     required this.onDismiss,
     required this.onReserve,
@@ -445,6 +583,9 @@ class _SelectedSeatSheet extends StatelessWidget {
 
   final int seatId;
   final SeatStatus status;
+  final bool isMyReservedSeat;
+  final bool syncPending;
+  final bool busy;
   final String roomLabel;
   final VoidCallback onDismiss;
   final VoidCallback onReserve;
@@ -452,6 +593,17 @@ class _SelectedSeatSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottomPad = MediaQuery.paddingOf(context).bottom;
+    final canReserve =
+        status.isReservable && !isMyReservedSeat && !syncPending && !busy;
+    final buttonLabel = busy
+        ? '예약 중...'
+        : syncPending
+        ? '서버 반영 대기'
+        : isMyReservedSeat
+        ? '예약된 좌석'
+        : status.isReservable
+        ? '이 좌석 예약하기'
+        : '예약 불가';
     return Padding(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.gutterMobile,
@@ -513,7 +665,14 @@ class _SelectedSeatSheet extends StatelessWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          _SheetStatusChip(status: status),
+                          _SheetStatusChip(
+                            status: status,
+                            label: syncPending
+                                ? '서버 반영 대기'
+                                : isMyReservedSeat
+                                ? '예약된 좌석'
+                                : null,
+                          ),
                           const SizedBox(width: 6),
                           Flexible(
                             child: Text(
@@ -545,7 +704,7 @@ class _SelectedSeatSheet extends StatelessWidget {
             SizedBox(
               height: 48,
               child: ElevatedButton(
-                onPressed: status.isReservable ? onReserve : null,
+                onPressed: canReserve ? onReserve : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: AppColors.onPrimary,
@@ -559,10 +718,19 @@ class _SelectedSeatSheet extends StatelessWidget {
                     fontSize: 15,
                   ),
                 ),
-                child: Text(status.isReservable ? '이 좌석 예약하기' : '예약 불가'),
+                child: Text(buttonLabel),
               ),
             ),
-            if (status.isReservable) ...[
+            if (syncPending) ...[
+              const SizedBox(height: 6),
+              Text(
+                '서버 좌석 상태를 다시 확인하는 중입니다',
+                style: AppTypography.labelSm.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                  fontSize: 11,
+                ),
+              ),
+            ] else if (status.isReservable && !isMyReservedSeat) ...[
               const SizedBox(height: 6),
               Text(
                 '최대 4시간 이용 가능 · 자리 비움 30분 시 자동 반납',
@@ -580,8 +748,9 @@ class _SelectedSeatSheet extends StatelessWidget {
 }
 
 class _SheetStatusChip extends StatelessWidget {
-  const _SheetStatusChip({required this.status});
+  const _SheetStatusChip({required this.status, this.label});
   final SeatStatus status;
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
@@ -596,7 +765,7 @@ class _SheetStatusChip extends StatelessWidget {
         ),
       ),
       child: Text(
-        status.label,
+        label ?? status.label,
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w700,

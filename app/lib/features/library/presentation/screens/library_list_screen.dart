@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
@@ -36,24 +38,68 @@ class LibraryListScreen extends ConsumerStatefulWidget {
 
 class _LibraryListScreenState extends ConsumerState<LibraryListScreen> {
   // mock 제거 — libseat 실시간 (activeSeatReservationProvider) watch.
+  bool _refreshing = false;
 
-  void _openRoom(BuildContext context, LibraryRoom room) {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_onRefresh(includeHistory: false));
+    });
+  }
+
+  Future<void> _openRoom(BuildContext context, LibraryRoom room) async {
     // asset 좌표 + 배경 이미지 + libseat 실시간 상태 merge 화면으로 진입.
-    Navigator.of(
+    await Navigator.of(
       context,
       rootNavigator: true,
     ).push(slideRoute(LibraryRoomScreen(room: room)));
+    if (!mounted) return;
+    unawaited(_onRefresh(includeHistory: false));
   }
 
   void _openHistory(BuildContext context) {
     Navigator.of(context).push(slideRoute(const LibraryUsageHistoryScreen()));
   }
 
-  Future<void> _onRefresh() async {
+  Future<void> _onRefresh({bool includeHistory = true}) async {
+    if (_refreshing) return;
+    setState(() => _refreshing = true);
     ref.invalidate(mySeatProvider);
     ref.invalidate(roomListProvider);
-    ref.invalidate(seatUsageHistoryProvider);
-    await Future<void>.delayed(const Duration(milliseconds: 400));
+    if (includeHistory) ref.invalidate(seatUsageHistoryProvider);
+    try {
+      await Future.wait<void>([
+        ref
+            .read(libseatSyncProvider)
+            .sync(
+              reason: includeHistory
+                  ? 'libraryListRefresh'
+                  : 'libraryListEnter',
+            )
+            .then<void>((_) {}),
+        ref.read(mySeatProvider.future).then<void>((_) {}),
+        ref.read(roomListProvider.future).then<void>((_) {}),
+        if (includeHistory)
+          ref.read(seatUsageHistoryProvider.future).then<void>((_) {}),
+      ]);
+      if (!includeHistory) {
+        ref.invalidate(seatUsageHistoryProvider);
+        unawaited(
+          ref
+              .read(seatUsageHistoryProvider.future)
+              .then<void>((_) {})
+              .catchError((_) {}),
+        );
+      }
+    } catch (_) {
+      // Provider error state is rendered by each dependent widget.
+    } finally {
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      if (mounted) {
+        setState(() => _refreshing = false);
+      }
+    }
   }
 
   @override
@@ -75,7 +121,7 @@ class _LibraryListScreenState extends ConsumerState<LibraryListScreen> {
         child: Stack(
           children: [
             SejongRefresh(
-              onRefresh: _onRefresh,
+              onRefresh: () => _onRefresh(),
               topInset: topPad + 64,
               child: ListView(
                 padding: EdgeInsets.fromLTRB(
@@ -114,7 +160,11 @@ class _LibraryListScreenState extends ConsumerState<LibraryListScreen> {
                 ],
               ),
             ),
-            const _LibraryListAppBar(title: '열람실'),
+            _LibraryListAppBar(
+              title: '열람실',
+              refreshing: _refreshing,
+              onRefresh: () => _onRefresh(),
+            ),
           ],
         ),
       ),
@@ -582,8 +632,15 @@ class _RoomCard extends StatelessWidget {
 }
 
 class _LibraryListAppBar extends StatelessWidget {
-  const _LibraryListAppBar({required this.title});
+  const _LibraryListAppBar({
+    required this.title,
+    required this.onRefresh,
+    required this.refreshing,
+  });
+
   final String title;
+  final Future<void> Function() onRefresh;
+  final bool refreshing;
 
   @override
   Widget build(BuildContext context) {
@@ -595,12 +652,21 @@ class _LibraryListAppBar extends StatelessWidget {
         title: title,
         actions: [
           IconButton(
-            icon: const Icon(
-              Symbols.refresh,
-              color: AppColors.secondary,
-              size: 22,
-            ),
-            onPressed: () {},
+            tooltip: '새로고침',
+            icon: refreshing
+                ? const SizedBox.square(
+                    dimension: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.3,
+                      color: AppColors.secondary,
+                    ),
+                  )
+                : const Icon(
+                    Symbols.refresh,
+                    color: AppColors.secondary,
+                    size: 22,
+                  ),
+            onPressed: refreshing ? null : () => onRefresh(),
             splashRadius: 22,
           ),
         ],

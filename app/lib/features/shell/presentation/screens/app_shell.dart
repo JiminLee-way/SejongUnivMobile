@@ -8,6 +8,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sejong_smart_campus/core/diagnostics/crash_report.dart';
 import 'package:sejong_smart_campus/core/lifecycle/app_resume_handler.dart';
 import 'package:sejong_smart_campus/features/friends/presentation/providers/friend_request_watcher.dart';
+import 'package:sejong_smart_campus/features/libseat/data/datasources/libseat_notifications.dart';
+import 'package:sejong_smart_campus/features/libseat/presentation/providers/libseat_providers.dart';
+import 'package:sejong_smart_campus/features/library/presentation/screens/library_list_screen.dart';
 import 'package:sejong_smart_campus/features/support/presentation/screens/qna_compose_dialog.dart';
 import 'package:sejong_smart_campus/features/ucheck/data/datasources/auto_attend_permissions.dart';
 import 'package:sejong_smart_campus/features/ucheck/data/datasources/ucheck_notifications.dart';
@@ -16,6 +19,7 @@ import 'package:sejong_smart_campus/features/ucheck/presentation/providers/auto_
 import 'package:sejong_smart_campus/core/routing/app_page_route.dart';
 import 'package:sejong_smart_campus/core/theme/app_tokens.dart';
 import 'package:sejong_smart_campus/shared/widgets/mesh_background.dart';
+import 'package:sejong_smart_campus/shared/widgets/sejong_dialog.dart';
 import 'package:sejong_smart_campus/features/shell/presentation/widgets/bottom_nav_insets.dart';
 import 'package:sejong_smart_campus/features/shell/presentation/widgets/sejong_bottom_nav.dart';
 import 'package:sejong_smart_campus/features/community/presentation/screens/community_screen.dart';
@@ -80,6 +84,7 @@ class _AppShellState extends ConsumerState<AppShell>
   /// 강도를 조절하기 위함.
   DateTime? _pausedAt;
   StreamSubscription<dynamic>? _notifTapSub;
+  StreamSubscription<dynamic>? _libseatNotifTapSub;
   // 받은 친구요청 포그라운드 폴링(30초). resume에서 시작, pause에서 정지.
   Timer? _friendPoll;
 
@@ -121,13 +126,24 @@ class _AppShellState extends ConsumerState<AppShell>
       if (launchPayload != null && mounted) {
         _handleNotificationPayload(launchPayload);
       }
+      final libseatLaunchPayload = await LibseatNotifications.instance
+          .launchPayload();
+      if (libseatLaunchPayload != null && mounted) {
+        unawaited(_handleLibseatNotificationPayload(libseatLaunchPayload));
+      }
       _notifTapSub = UCheckNotifications.instance.onTap.listen((response) {
         final p = response.payload;
         if (p != null) _handleNotificationPayload(p);
       });
+      _libseatNotifTapSub = LibseatNotifications.instance.onTap.listen((
+        response,
+      ) {
+        final p = response.payload;
+        if (p != null) unawaited(_handleLibseatNotificationPayload(p));
+      });
       // 콜드부트 시 받은 친구요청 확인 + 폴링 시작.
       _startFriendPoll();
-      // 직전 실행에서 크래시 덤프가 남아 있으면 "리포트 보낼까요?" 프롬프트.
+      // 직전 실행에서 실제 crash/anr evidence가 있으면 리포트 프롬프트.
       unawaited(_checkPendingCrash());
     });
   }
@@ -171,16 +187,14 @@ class _AppShellState extends ConsumerState<AppShell>
     if (open == true) await perms.openSettings();
   }
 
-  /// 직전 실행이 **비정상 종료**(포그라운드 도중 프로세스 사망)였을 때만 리포트
-  /// 전송을 제안한다. 판별 근거는 세션 sentinel([CrashReport.previousSessionUnclean])
-  /// 하나 — 살아남는 비동기 에러는 더 이상 트리거가 아니다(정상 종료 오탐 차단).
-  /// 수락 시 마지막 에러 덤프(있으면)가 첨부된 1:1 문의 작성 화면으로.
+  /// Android가 기록한 실제 crash/anr 종료 사유가 있을 때만 리포트 전송을 제안한다.
+  /// `session.dirty` sentinel이나 Dart 에러 덤프 단독으로는 prompt를 띄우지 않는다.
   Future<void> _checkPendingCrash() async {
     if (!kReleaseMode) return;
+    final evidence = CrashReport.instance.previousCrashEvidence;
     // 덤프는 트리거가 아니라 첨부용 — 정상 종료여도 항상 회수해 stale을 제거한다.
     final dump = await CrashReport.instance.takePending();
-    // 비정상 종료가 아니면(정상 백그라운드 후 종료/스와이프) 조용히 끝낸다.
-    if (!CrashReport.instance.previousSessionUnclean) return;
+    if (evidence == null) return;
     // 다이얼로그는 AppShell의 context가 아니라 **루트 네비게이터의 안정적인
     // context**로 띄운다. AppShell은 AuthGate의 AnimatedSwitcher가 로그인↔셸을
     // swap할 때 비활성화될 수 있어(콜드부트 850ms 지연 + 디스크 읽기 await 사이),
@@ -208,6 +222,7 @@ class _AppShellState extends ConsumerState<AppShell>
         ],
       ),
     );
+    await CrashReport.instance.acknowledgePreviousCrash();
     if (send != true) return;
     final composeContext = rootNavigatorKey.currentContext;
     if (composeContext == null || !composeContext.mounted) return;
@@ -216,13 +231,15 @@ class _AppShellState extends ConsumerState<AppShell>
       initialCategoryId: 'bug',
       initialTitle: '앱 비정상 종료 리포트',
       initialContent: '앱이 예기치 않게 종료되었습니다.\n(진단 로그가 자동 첨부됩니다.)',
-      // Dart 레벨 에러 덤프가 없으면(네이티브 크래시/OOM/강제 종료) 안내문으로 대체.
-      attachedLog:
-          dump ??
-          '(직전 세션이 포그라운드에서 비정상 종료됨 — Dart 에러 덤프 없음. '
-              '네이티브 크래시/OOM/강제 종료 가능성. 네이티브 스택은 Sentry 참고.)',
+      attachedLog: _composeCrashAttachment(dump, evidence),
       isCrashReport: true,
     );
+  }
+
+  String _composeCrashAttachment(String? dump, CrashEvidence evidence) {
+    final exitInfo = evidence.toReportLog();
+    if (dump == null || dump.trim().isEmpty) return exitInfo;
+    return '${CrashReport.clamp(dump)}\n\n$exitInfo';
   }
 
   /// 받은 친구요청 폴링 — 즉시 1회 + 30초 주기. 포그라운드에서만 동작.
@@ -250,10 +267,32 @@ class _AppShellState extends ConsumerState<AppShell>
         .checkAndTrigger(reason: 'notif_tap:$payload');
   }
 
+  Future<void> _handleLibseatNotificationPayload(String payload) async {
+    final parsed = LibseatNotificationPayload.parse(payload);
+    if (parsed == null) return;
+    rootNavigatorKey.currentState?.push(slideRoute(const LibraryListScreen()));
+    final result = await _container
+        .read(libseatSyncProvider)
+        .sync(
+          reason: 'notif_tap:${parsed.kind.wireName}',
+          notificationPayloadKey: parsed.reservationKey,
+        );
+    if (!result.returnAcknowledgementDue) return;
+    final ctx = rootNavigatorKey.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+    await showSejongResultDialog(
+      ctx,
+      success: true,
+      title: '좌석 반납 확인',
+      message: '좌석 반납이 확인되어 모든 알림이 종료됐어요.',
+    );
+  }
+
   @override
   void dispose() {
     if (identical(_current, this)) _current = null;
     _notifTapSub?.cancel();
+    _libseatNotifTapSub?.cancel();
     _stopFriendPoll();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();

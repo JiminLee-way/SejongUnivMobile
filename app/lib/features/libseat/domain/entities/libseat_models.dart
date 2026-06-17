@@ -101,6 +101,7 @@ class MySeat {
     required this.startTime,
     required this.endTime,
     required this.extensionsUsed,
+    this.issuedDate,
     this.reserveNo,
   });
 
@@ -108,39 +109,43 @@ class MySeat {
   final String roomName;
   final String seatNo;
 
-  /// "HH:mm" 형식 그대로 — 날짜는 모두 "오늘".
+  /// "HH:mm" 형식 그대로. 날짜는 서버 카드 날짜가 있으면 그 날짜, 없으면 오늘.
   final String startTime;
   final String endTime;
 
   /// 연장 횟수 (libseat 페이지 그대로).
   final int extensionsUsed;
 
+  /// mySeat.php 카드 상단의 서버 날짜. 없으면 기존처럼 현재 날짜 기준으로 파싱.
+  final DateTime? issuedDate;
+
   /// 시설예약(스터디룸/시네마룸/S-Lounge) 취소에 필요한 예약번호.
   /// 열람실(좌석)에는 없음 — null 가능.
   final String? reserveNo;
 
   /// `HH:mm` 또는 `HH시 mm분` → DateTime (오늘 기준, end < start면 익일).
-  DateTime get startedAt => _parseTimeToday(startTime, isEnd: false);
+  DateTime get startedAt => _parseTimeOnDate(startTime, date: issuedDate);
   DateTime get expiresAt {
     final s = startedAt;
-    final e = _parseTimeToday(endTime, isEnd: true, anchor: s);
+    final e = _parseTimeOnDate(endTime, date: issuedDate, anchor: s);
     return e;
   }
 
-  static DateTime _parseTimeToday(
+  static DateTime _parseTimeOnDate(
     String hhmm, {
-    required bool isEnd,
+    DateTime? date,
     DateTime? anchor,
   }) {
     final now = DateTime.now();
+    final base = date ?? now;
     final m = RegExp(r'(\d{1,2})[:시]?\s*(\d{1,2})').firstMatch(hhmm);
     if (m == null) {
-      return DateTime(now.year, now.month, now.day);
+      return DateTime(base.year, base.month, base.day);
     }
     final h = int.parse(m.group(1)!);
     final mm = int.parse(m.group(2)!);
-    var dt = DateTime(now.year, now.month, now.day, h, mm);
-    if (isEnd && anchor != null && dt.isBefore(anchor)) {
+    var dt = DateTime(base.year, base.month, base.day, h, mm);
+    if (anchor != null && dt.isBefore(anchor)) {
       dt = dt.add(const Duration(days: 1));
     }
     return dt;

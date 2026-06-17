@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 
 import 'package:sejong_smart_campus/core/network/sejong_api_client.dart';
 import 'package:sejong_smart_campus/features/auth/presentation/providers/auth_providers.dart';
+import 'package:sejong_smart_campus/features/libseat/data/datasources/libseat_notification_state_local.dart';
 import 'package:sejong_smart_campus/features/libseat/data/datasources/facility_remote.dart';
 import 'package:sejong_smart_campus/features/libseat/data/datasources/libseat_notifications.dart';
 import 'package:sejong_smart_campus/features/libseat/data/datasources/libseat_remote.dart';
@@ -420,6 +421,150 @@ final activeSeatReservationProvider = Provider<SeatReservation?>((ref) {
   );
 });
 
+final libseatNotificationStateLocalProvider =
+    Provider<LibseatNotificationStateLocal>(
+      (_) => LibseatNotificationStateLocal(),
+    );
+
+final libseatSyncProvider = Provider<LibseatSync>(
+  (ref) => LibseatSyncService(ref),
+);
+
+abstract class LibseatSync {
+  Future<LibseatSyncResult> sync({
+    required String reason,
+    String? notificationPayloadKey,
+    int? visibleRoomNo,
+    bool expectNoSeat = false,
+  });
+}
+
+class LibseatSyncResult {
+  const LibseatSyncResult({
+    required this.reason,
+    this.seat,
+    this.returnAcknowledgementDue = false,
+    this.acknowledgedReturnKey,
+    this.error,
+  });
+
+  final String reason;
+  final MySeat? seat;
+  final bool returnAcknowledgementDue;
+  final String? acknowledgedReturnKey;
+  final Object? error;
+
+  bool get success => error == null;
+}
+
+class LibseatSyncService implements LibseatSync {
+  LibseatSyncService(this._ref);
+
+  final Ref _ref;
+
+  @override
+  Future<LibseatSyncResult> sync({
+    required String reason,
+    String? notificationPayloadKey,
+    int? visibleRoomNo,
+    bool expectNoSeat = false,
+  }) async {
+    final local = _ref.read(libseatNotificationStateLocalProvider);
+    final previousState = await local.read();
+    try {
+      final remote = await _ref.read(_libseatRemoteProvider.future);
+      var seat = await remote.fetchMySeat();
+      if (expectNoSeat && seat != null) {
+        seat = await _fetchMySeatUntilEmpty(remote);
+      }
+      var returnAcknowledgementDue = false;
+      String? acknowledgedReturnKey;
+
+      if (seat == null) {
+        _ref.read(seatOverrideProvider.notifier).hide();
+        await LibseatNotifications.instance.cancelAll();
+        await local.clearSnapshot();
+        if (notificationPayloadKey != null &&
+            !await local.hasAcknowledgedReturn(notificationPayloadKey)) {
+          await local.acknowledgeReturn(notificationPayloadKey);
+          returnAcknowledgementDue = true;
+          acknowledgedReturnKey = notificationPayloadKey;
+        }
+      } else {
+        _ref.read(seatOverrideProvider.notifier).show(seat);
+        final snapshot = LibseatReservationSnapshot.fromMySeat(seat);
+        final previous = previousState.current;
+        if (previous == null || !previous.hasSameSchedule(snapshot)) {
+          await LibseatNotifications.instance.scheduleForSeat(
+            seat,
+            promptExactAlarm: _shouldPromptExactAlarm(reason),
+          );
+          await local.saveSnapshot(snapshot);
+        }
+      }
+
+      await _refreshViews(seat: seat, visibleRoomNo: visibleRoomNo);
+      return LibseatSyncResult(
+        reason: reason,
+        seat: seat,
+        returnAcknowledgementDue: returnAcknowledgementDue,
+        acknowledgedReturnKey: acknowledgedReturnKey,
+      );
+    } catch (e) {
+      return LibseatSyncResult(reason: reason, error: e);
+    }
+  }
+
+  Future<MySeat?> _fetchMySeatUntilEmpty(LibseatRemote remote) async {
+    for (var i = 0; i < 4; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      final seat = await remote.fetchMySeat();
+      if (seat == null) return null;
+    }
+    return remote.fetchMySeat();
+  }
+
+  Future<void> _refreshViews({
+    required MySeat? seat,
+    int? visibleRoomNo,
+  }) async {
+    _ref.invalidate(mySeatProvider);
+    _ref.invalidate(roomListProvider);
+    _ref.invalidate(seatUsageHistoryProvider);
+
+    if (visibleRoomNo != null) {
+      for (final rn in libseatRealRoomNos(visibleRoomNo)) {
+        _ref.invalidate(seatMapProvider(rn));
+      }
+      _ref.invalidate(seatMapForRoomProvider(visibleRoomNo));
+    }
+    if (seat != null) {
+      _ref.invalidate(seatMapProvider(seat.roomNo));
+    }
+
+    await Future.wait<void>([
+      _ignore(_ref.read(roomListProvider.future)),
+      if (visibleRoomNo != null)
+        _ignore(_ref.read(seatMapForRoomProvider(visibleRoomNo).future)),
+    ]);
+  }
+
+  Future<void> _ignore(Future<Object?> future) async {
+    try {
+      await future;
+    } catch (_) {
+      // The dependent provider will render its own error state.
+    }
+  }
+
+  bool _shouldPromptExactAlarm(String reason) {
+    return reason == 'reserve' ||
+        reason == 'extend' ||
+        reason == 'libraryListRefresh' ||
+        reason == 'homeRefresh';
+  }
+}
+
 Future<LibseatResult> cancelFacilityReservation(
   WidgetRef ref,
   String reserveNo,
@@ -453,59 +598,37 @@ Future<LibseatResult> reserveLibseat(
   required int roomNo,
   required String seatNo,
   String? roomName,
+  int? visibleRoomNo,
 }) async {
   final remote = await ref.read(_libseatRemoteProvider.future);
   final r = await remote.reserveSeat(roomNo: roomNo, seatNo: seatNo);
   if (r.success) {
-    final ov = ref.read(seatOverrideProvider.notifier);
-    // 1차 즉시 조회 — 대개 여기서 정확한 좌석을 받아 곧장 카드 노출(placeholder
-    // 깜빡임 없음). libseat이 아직 mySeat.php에 반영 못했으면(전파 지연) null.
-    var mine = await remote.fetchMySeat();
-    if (mine != null) {
-      ov.show(mine);
-    } else {
-      // 반영 지연 → 방금 예약한 정보로 낙관적 카드를 **즉시** 띄운다. 이렇게 안
-      // 하면 카드가 다음 30초 폴링(mySeatProvider)까지 안 떠서 "20초 넘게 걸린다"
-      // 는 증상이 난다. 정확한 종료시간/룸명은 bounded 재시도로 곧 보정.
-      final now = DateTime.now();
-      // 종료시간은 반드시 [_hhmm]로 "HH:mm" 문자열로 넣는다 — MySeat.expiresAt가
-      // 같은 포맷을 anchor 기준으로 재파싱해 자정 넘김(end<start면 +1일)을
-      // 처리하므로, 22:30 예약→endTime "02:30"도 익일로 올바르게 잡힌다.
-      // 이 round-trip 불변식이 깨지면 카운트다운이 음수가 된다.
-      ov.show(
-        MySeat(
-          roomNo: roomNo,
-          roomName: roomName ?? '열람실',
-          seatNo: seatNo,
-          startTime: _hhmm(now),
-          endTime: _hhmm(now.add(const Duration(hours: 4))),
-          extensionsUsed: 0,
-        ),
-      );
-      mine = await _fetchMySeatBounded(remote);
-      if (mine != null) ov.show(mine);
-    }
+    final mine = await _fetchMySeatBounded(remote);
+    if (mine != null) ref.read(seatOverrideProvider.notifier).show(mine);
+    final sync = await ref
+        .read(libseatSyncProvider)
+        .sync(reason: 'reserve', visibleRoomNo: visibleRoomNo ?? roomNo);
+    final syncedSeat = sync.seat ?? mine;
     // ignore: avoid_print
     print(
       '[LIBSEAT] reserve OK room=$roomNo seat=$seatNo '
-      '-> mine=${mine?.roomName} ${mine?.seatNo} exp=${mine?.endTime}',
+      '-> mine=${syncedSeat?.roomName} ${syncedSeat?.seatNo} '
+      'exp=${syncedSeat?.endTime}',
     );
     await _appendHistory(
       ref,
-      roomLabel: mine?.roomName ?? roomName ?? '열람실 $roomNo · $seatNo번',
-      durationMinutes: _durationMinutes(mine?.startTime, mine?.endTime),
+      roomLabel: syncedSeat?.roomName ?? roomName ?? '열람실 $roomNo · $seatNo번',
+      durationMinutes: _durationMinutes(
+        syncedSeat?.startTime,
+        syncedSeat?.endTime,
+      ),
       status: LibraryUsageStatus.completed,
     );
-    // 종료 30분·5분 전 알림 — 정확한 종료시간을 받은 경우에만(placeholder의
-    // 추정 4시간 종료시간으로 엉뚱한 알림을 걸지 않도록).
-    if (mine != null) {
-      await LibseatNotifications.instance.scheduleForExpiry(
-        mine.expiresAt,
-        roomLabel: mine.roomName,
-      );
-    }
     ref.invalidate(mySeatProvider);
     ref.invalidate(seatMapProvider(roomNo));
+    if (visibleRoomNo != null) {
+      ref.invalidate(seatMapForRoomProvider(visibleRoomNo));
+    }
     ref.invalidate(roomListProvider);
     ref.invalidate(usageHistoryProvider);
     ref.invalidate(seatUsageHistoryProvider);
@@ -536,7 +659,9 @@ Future<LibseatResult> returnLibseat(
       status: LibraryUsageStatus.completed,
     );
     // 반납했으니 예약 종료 알림 취소 (#4).
-    await LibseatNotifications.instance.cancelAll();
+    await ref
+        .read(libseatSyncProvider)
+        .sync(reason: 'return', visibleRoomNo: roomNo, expectNoSeat: true);
     ref.invalidate(mySeatProvider);
     ref.invalidate(seatMapProvider(roomNo));
     ref.invalidate(roomListProvider);
@@ -561,22 +686,19 @@ Future<LibseatResult> extendLibseat(
   );
   if (r.success) {
     // 새 종료시간을 알아야 알림을 재예약 + 타이머가 갱신되므로 재조회.
-    final mine = await remote.fetchMySeat();
+    final mine = await _fetchMySeatBounded(remote, tries: 3);
     // 연장된 새 종료시간을 카드/타이머에 즉시 반영.
     if (mine != null) ref.read(seatOverrideProvider.notifier).show(mine);
+    final sync = await ref
+        .read(libseatSyncProvider)
+        .sync(reason: 'extend', visibleRoomNo: roomNo);
+    final syncedSeat = sync.seat ?? mine;
     await _appendHistory(
       ref,
-      roomLabel: '좌석 연장 · ${mine?.roomName ?? '열람실 $roomNo · $seatNo번'}',
+      roomLabel: '좌석 연장 · ${syncedSeat?.roomName ?? '열람실 $roomNo · $seatNo번'}',
       durationMinutes: 60,
       status: LibraryUsageStatus.completed,
     );
-    // 연장된 종료시간 기준 30분·5분 알림 재예약 (#5).
-    if (mine != null) {
-      await LibseatNotifications.instance.scheduleForExpiry(
-        mine.expiresAt,
-        roomLabel: mine.roomName,
-      );
-    }
     ref.invalidate(mySeatProvider);
     ref.invalidate(usageHistoryProvider);
     ref.invalidate(seatUsageHistoryProvider);
@@ -719,8 +841,8 @@ Future<void> _appendHistory(
 }
 
 /// 예약 직후 libseat이 `mySeat.php`에 반영되기까지의 짧은 지연을 흡수하는
-/// bounded 재시도. 카드는 이미 낙관적 placeholder로 떠 있고, 이건 **정확한
-/// 종료시간/룸명 보정용**이라 전부 실패(null)해도 카드 자체는 유지된다.
+/// bounded 재시도. 예약 성공 응답만으로 `now + 4h` 같은 추정 좌석을 만들지 않고,
+/// 이 값이 잡힐 때만 정확한 종료시간/룸명을 카드와 알림에 반영한다.
 /// 최악 ~2.5s(=4회 × 500ms gap) 후 포기 → 다음 폴링/resume이 서버값으로 정정.
 Future<MySeat?> _fetchMySeatBounded(
   LibseatRemote remote, {
@@ -738,9 +860,6 @@ Future<MySeat?> _fetchMySeatBounded(
   }
   return null;
 }
-
-String _hhmm(DateTime d) =>
-    '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
 int _durationMinutes(String? start, String? end) {
   if (start == null || end == null) return 0;

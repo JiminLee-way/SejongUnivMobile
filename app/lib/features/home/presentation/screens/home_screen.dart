@@ -55,6 +55,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _startMySeatPolling();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_onRefresh());
+    });
   }
 
   @override
@@ -82,7 +85,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _mySeatPoll?.cancel();
     _mySeatPoll = Timer.periodic(_mySeatPollInterval, (_) {
       if (!mounted) return;
-      ref.invalidate(mySeatProvider);
+      unawaited(ref.read(libseatSyncProvider).sync(reason: 'homePoll'));
     });
   }
 
@@ -117,6 +120,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     // 끊고, 최소 300ms는 노출해 짧은 응답에서 스피너가 깜빡이지 않게 한다.
     await Future.wait<void>([
       Future<void>.delayed(const Duration(milliseconds: 300)),
+      ref
+          .read(libseatSyncProvider)
+          .sync(reason: 'homeRefresh')
+          .then<void>((_) {}),
       _refetch(ref.read(homeEventsProvider.future)),
       _refetch(ref.read(roomListProvider.future)),
       _refetch(ref.read(homeNoticePreviewProvider.future)),

@@ -4,6 +4,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:sejong_smart_campus/features/library/domain/entities/library_models.dart';
 import 'package:sejong_smart_campus/core/theme/app_tokens.dart';
 import 'package:sejong_smart_campus/core/theme/app_typography.dart';
+import 'package:sejong_smart_campus/shared/widgets/shimmer.dart';
 
 /// 열람실 좌석맵.
 ///
@@ -17,12 +18,14 @@ class SeatMap extends StatefulWidget {
     required this.statuses,
     this.selectedSeatId,
     this.onSeatTap,
+    this.loading = false,
   });
 
   final RoomLayout layout;
   final SeatStatusMap statuses;
   final int? selectedSeatId;
   final ValueChanged<int>? onSeatTap;
+  final bool loading;
 
   @override
   State<SeatMap> createState() => _SeatMapState();
@@ -106,14 +109,18 @@ class _SeatMapState extends State<SeatMap> {
                       top: s.y - 4,
                       width: s.w,
                       height: s.h,
-                      child: _SeatTile(
-                        seat: s,
-                        status: widget.statuses[s.id] ?? SeatStatus.unavailable,
-                        selected: widget.selectedSeatId == s.id,
-                        onTap: widget.onSeatTap == null
-                            ? null
-                            : () => widget.onSeatTap!(s.id),
-                      ),
+                      child: widget.loading
+                          ? _SeatSkeletonTile(seat: s)
+                          : _SeatTile(
+                              seat: s,
+                              status:
+                                  widget.statuses[s.id] ??
+                                  SeatStatus.unavailable,
+                              selected: widget.selectedSeatId == s.id,
+                              onTap: widget.onSeatTap == null
+                                  ? null
+                                  : () => widget.onSeatTap!(s.id),
+                            ),
                     ),
                 ],
               ),
@@ -121,6 +128,26 @@ class _SeatMapState extends State<SeatMap> {
           ),
         );
       },
+    );
+  }
+}
+
+class _SeatSkeletonTile extends StatelessWidget {
+  const _SeatSkeletonTile({required this.seat});
+
+  final SeatPosition seat;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Shimmer(
+        child: ShimmerBox(
+          key: ValueKey('seat-skeleton-${seat.id}'),
+          width: seat.w,
+          height: seat.h,
+          radius: 5,
+        ),
+      ),
     );
   }
 }
@@ -265,11 +292,13 @@ class RoomHeader extends StatelessWidget {
     required this.name,
     required this.occupied,
     required this.total,
+    this.loading = false,
   });
 
   final String name;
   final int occupied;
   final int total;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
@@ -303,34 +332,52 @@ class RoomHeader extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            RichText(
-              text: TextSpan(
-                style: AppTypography.headlineMd.copyWith(fontSize: 14),
-                children: [
-                  TextSpan(
-                    text: '$available',
-                    style: TextStyle(
-                      color: SeatStatus.available.color,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 24,
+            if (loading)
+              const Shimmer(
+                child: ShimmerBox(
+                  key: ValueKey('room-header-free-skeleton'),
+                  width: 128,
+                  height: 24,
+                ),
+              )
+            else
+              RichText(
+                text: TextSpan(
+                  style: AppTypography.headlineMd.copyWith(fontSize: 14),
+                  children: [
+                    TextSpan(
+                      text: '$available',
+                      style: TextStyle(
+                        color: SeatStatus.available.color,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 24,
+                      ),
                     ),
-                  ),
-                  TextSpan(
-                    text: ' 자리 비어있음',
-                    style: AppTypography.labelMd.copyWith(
-                      color: AppColors.onSurfaceVariant,
+                    TextSpan(
+                      text: ' 자리 비어있음',
+                      style: AppTypography.labelMd.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
             const Spacer(),
-            Text(
-              '$occupied / $total',
-              style: AppTypography.labelSm.copyWith(
-                color: AppColors.onSurfaceVariant,
+            if (loading)
+              const Shimmer(
+                child: ShimmerBox(
+                  key: ValueKey('room-header-count-skeleton'),
+                  width: 56,
+                  height: 12,
+                ),
+              )
+            else
+              Text(
+                '$occupied / $total',
+                style: AppTypography.labelSm.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                ),
               ),
-            ),
           ],
         ),
         const SizedBox(height: 8),
@@ -343,17 +390,28 @@ class RoomHeader extends StatelessWidget {
                 Positioned.fill(
                   child: Container(color: AppColors.surfaceContainerHigh),
                 ),
-                FractionallySizedBox(
-                  alignment: Alignment.centerLeft,
-                  widthFactor: ratio.clamp(0.0, 1.0),
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [AppColors.primary, AppColors.surfaceTint],
+                if (loading)
+                  const Positioned.fill(
+                    child: Shimmer(
+                      child: ShimmerBox(
+                        key: ValueKey('room-header-gauge-skeleton'),
+                        height: 8,
+                        radius: AppRadius.full,
+                      ),
+                    ),
+                  )
+                else
+                  FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: ratio.clamp(0.0, 1.0),
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [AppColors.primary, AppColors.surfaceTint],
+                        ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           ),

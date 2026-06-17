@@ -33,6 +33,20 @@ const _noSeatHtml = '''
 </body></html>
 ''';
 
+const _crossMidnightHtml = '''
+<html><body>
+<section class="main-lib"><div class="white-card-container">
+  <div class="top-card"><h6>열람실</h6><h6>2026.03.27</h6></div>
+  <div class="middle-card"><h3>제4열람실B</h3></div>
+  <div class="bottom-card">
+    <div class="bc-data"><h6>좌석번호</h6><h4>174번</h4></div>
+    <div class="bc-data"><h6>사용시간</h6><h4>20:55 ~ 02:56</h4></div>
+    <div class="bc-data"><h6>연장 횟 수</h6><p><span>1회 (1회 남음)</span></p></div>
+  </div>
+</div></section>
+</body></html>
+''';
+
 void main() {
   group('LibseatRemote.parseMySeat', () {
     test('decoy "없습니다"가 있어도 활성 열람실 좌석을 정확히 파싱', () {
@@ -44,12 +58,23 @@ void main() {
       expect(s.startTime, '15:40');
       expect(s.endTime, '21:40');
       expect(s.extensionsUsed, 0);
+      expect(s.issuedDate, DateTime(2026, 5, 30));
     });
 
-    test('expiresAt가 종료시간(21:40)로 계산', () {
+    test('startedAt/expiresAt가 서버 카드 날짜 기준으로 계산', () {
       final s = LibseatRemote.parseMySeat(_activeHtml)!;
-      expect(s.expiresAt.hour, 21);
-      expect(s.expiresAt.minute, 40);
+      expect(s.startedAt, DateTime(2026, 5, 30, 15, 40));
+      expect(s.expiresAt, DateTime(2026, 5, 30, 21, 40));
+    });
+
+    test('자정 넘김 사용시간은 종료일을 다음날로 계산', () {
+      final s = LibseatRemote.parseMySeat(_crossMidnightHtml);
+      expect(s, isNotNull);
+      expect(s!.roomName, '제4열람실B');
+      expect(s.roomNo, 16);
+      expect(s.seatNo, '174');
+      expect(s.startedAt, DateTime(2026, 3, 27, 20, 55));
+      expect(s.expiresAt, DateTime(2026, 3, 28, 2, 56));
     });
 
     test('활성 좌석 없으면(빈 카드만) null', () {

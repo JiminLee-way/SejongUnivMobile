@@ -50,13 +50,13 @@ Future<void> main() async {
   // 열람실 예약 종료 30분·5분 전 알림 채널 등록. 실제 예약 스케줄은
   // reserveLibseat/extendLibseat 성공 시점에 잡힌다.
   await LibseatNotifications.instance.init();
-  // 친구 알림(헤드업) 채널 등록. 탭 콜백은 등록하지 않아 ucheck 자동출석 탭
-  // 라우팅을 덮어쓰지 않는다.
+  // 친구 알림(헤드업) 채널 등록. 탭 콜백은 공용 NotificationTapBus로만 전달해
+  // ucheck/libseat 라우팅을 덮어쓰지 않는다.
   await FriendNotifications.instance.init();
-  // 크래시 덤프 경로 확보 + 직전 세션 비정상 종료 판별 + 이번 세션 dirty 마킹.
+  // 크래시 덤프 경로 확보 + Android 종료 사유 조회 + 이번 세션 dirty 마킹.
   await CrashReport.instance.init();
-  // 정상/비정상 종료 구분용 세션 sentinel을 라이프사이클에 연결(로그인 전 화면 포함
-  // 전역). release에서만 — 디버그는 IDE-stop이 강제종료로 잡혀 오탐난다.
+  // 세션 보조 컨텍스트를 라이프사이클에 연결(로그인 전 화면 포함 전역).
+  // 사용자-facing crash 판단은 Android ApplicationExitInfo evidence가 전담한다.
   if (kReleaseMode) CrashReport.instance.installLifecycleObserver();
 
   // Sentry로 자동 크래시/에러 수집(네이티브 포함). DSN이 비어 있으면 SDK는
@@ -91,10 +91,8 @@ void _chainDiagnosticsHandlers() {
   final sentryPlatformOnError = PlatformDispatcher.instance.onError;
   PlatformDispatcher.instance.onError = (error, stack) {
     AppLog.instance.add('Uncaught: $error', level: 'F');
-    // 에러 덤프는 **트리거가 아니라 첨부용 컨텍스트**다. 비정상 종료 판별은 세션
-    // sentinel(CrashReport)이 전담하므로, 여기서 덤프를 남겨도 앱이 살아남으면
-    // (대부분의 비동기 에러가 그렇다) 다음 정상 백그라운드 전환 때 markSessionClean이
-    // 덤프까지 비운다 → 더 이상 "정상 종료인데 비정상 종료 프롬프트" 오탐 없음.
+    // 에러 덤프는 **트리거가 아니라 첨부용 컨텍스트**다. 사용자-facing 비정상 종료
+    // 판별은 Android ApplicationExitInfo evidence가 전담한다.
     // release 전용: 디버그 프레임워크 assert를 디스크에 적재할 이유가 없다.
     if (kReleaseMode) {
       // 인메모리 버퍼는 프로세스 종료로 사라지므로, 마지막 에러 컨텍스트를 디스크에

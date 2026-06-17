@@ -35,6 +35,21 @@ Future<void> handleAppResume(
 }) async {
   await _ensureFreshAccessToken(container);
 
+  const heavyRefreshThreshold = Duration(seconds: 30);
+  final shouldHeavyRefresh = pauseDuration >= heavyRefreshThreshold;
+  if (shouldHeavyRefresh) {
+    // 긴 sleep 후에는 reading-room-token cache가 서버 세션과 어긋날 수 있으므로
+    // 열람실 sync 전에 새 token source를 쓰게 한다.
+    container.invalidate(libseatTokenSourceProvider);
+  }
+
+  unawaited(
+    container
+        .read(libseatSyncProvider)
+        .sync(reason: 'appResume')
+        .then<void>((_) {}),
+  );
+
   // V2 자동출석 — "지금이 출석 시간인가?"를 **복귀할 때마다(짧은 전환 포함)**
   // 확인한다. AppShell이 어느 탭에 있든 이 함수를 호출하므로 탭 독립적이고,
   // 컨트롤러 자체 30초 debounce가 폭주를 막는다. 무거운 일괄 invalidate(아래
@@ -50,8 +65,7 @@ Future<void> handleAppResume(
 
   // 짧은 일시정지(앱 전환, 빠른 알림 확인 등)는 도메인 cache까지 무효화하지
   // 않는다 — 새 자료가 필요한 사용자는 pull-to-refresh로 명시 가능.
-  const heavyRefreshThreshold = Duration(seconds: 30);
-  if (pauseDuration < heavyRefreshThreshold) return;
+  if (!shouldHeavyRefresh) return;
 
   // 자체서버 last_seen_at 갱신 — 처리방침 §보유기간 ④ "3개월 휴면 자동 삭제"
   // 산정 기준. heavyRefreshThreshold(30초)가 자연 throttle 역할을 하므로
@@ -62,9 +76,6 @@ Future<void> handleAppResume(
         .updateLastSeen()
         .catchError((_) {}),
   );
-
-  // libseat token 캐시 폐기.
-  container.invalidate(libseatTokenSourceProvider);
 
   // 활성 화면 어디에 있어도 stale 상태를 노출하지 않도록 일괄 무효화.
   // family는 인자 없이 invalidate하면 모든 키 인스턴스 정리.

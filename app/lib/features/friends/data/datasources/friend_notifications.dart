@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import 'package:sejong_smart_campus/core/notifications/notification_tap_bus.dart';
+
 /// 친구 관련 OS 로컬 알림(헤드업).
 ///
 /// 새 친구요청이 감지되면(앱 열림/복귀/30초 폴링) 상단에 채팅처럼 헤드업으로
@@ -34,6 +36,7 @@ class FriendNotifications {
     );
     await _plugin.initialize(
       const InitializationSettings(android: androidInit, iOS: iosInit),
+      onDidReceiveNotificationResponse: NotificationTapBus.instance.add,
     );
     if (Platform.isAndroid) {
       final android = _plugin

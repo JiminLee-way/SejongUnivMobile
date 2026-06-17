@@ -6,6 +6,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
+import 'package:sejong_smart_campus/core/notifications/notification_tap_bus.dart';
+
 /// UCheck V2 자동출석 OS 알림 wrapper.
 ///
 /// **3 채널**:
@@ -39,9 +41,10 @@ class UCheckNotifications {
   static String payloadForResult(int lectureNo) => 'result:$lectureNo';
 
   /// 탭 콜백 broadcast — AutoAttendController가 subscribe.
-  final StreamController<NotificationResponse> _tapStream =
-      StreamController<NotificationResponse>.broadcast();
-  Stream<NotificationResponse> get onTap => _tapStream.stream;
+  Stream<NotificationResponse> get onTap => NotificationTapBus
+      .instance
+      .responses
+      .where((response) => _isUCheckPayload(response.payload));
 
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
@@ -76,7 +79,7 @@ class UCheckNotifications {
     await _plugin.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (response) {
-        _tapStream.add(response);
+        NotificationTapBus.instance.add(response);
       },
     );
 
@@ -370,10 +373,15 @@ class UCheckNotifications {
   Future<String?> launchPayload() async {
     final details = await _plugin.getNotificationAppLaunchDetails();
     if (details?.didNotificationLaunchApp == true) {
-      return details?.notificationResponse?.payload;
+      final payload = details?.notificationResponse?.payload;
+      return _isUCheckPayload(payload) ? payload : null;
     }
     return null;
   }
+
+  bool _isUCheckPayload(String? payload) =>
+      payload != null &&
+      (payload.startsWith('preclass:') || payload.startsWith('result:'));
 
   // ID 충돌 방지: prefix별 base + lectureNo 작은 정수.
   // Android notification id는 int (32-bit).
