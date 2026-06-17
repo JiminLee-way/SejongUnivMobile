@@ -18,6 +18,7 @@ import 'package:sejong_smart_campus/shared/widgets/sejong_refresh.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_sub_app_bar.dart';
 import 'package:sejong_smart_campus/shared/widgets/shimmer.dart';
 import 'package:sejong_smart_campus/features/library/presentation/widgets/seat_card.dart';
+import 'package:sejong_smart_campus/features/library/presentation/widgets/libseat_reminder_settings_sheet.dart';
 import 'package:sejong_smart_campus/features/library/presentation/screens/library_room_screen.dart';
 import 'package:sejong_smart_campus/features/library/presentation/screens/library_usage_history_screen.dart';
 
@@ -113,6 +114,7 @@ class _LibraryListScreenState extends ConsumerState<LibraryListScreen> {
         .where((r) => r.status == LibraryUsageStatus.unreturned)
         .length;
     final activeReservation = ref.watch(activeSeatReservationProvider);
+    final seatActionBusy = ref.watch(libseatSeatActionStateProvider).busy;
     final roomsAsync = ref.watch(roomListProvider);
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -137,6 +139,7 @@ class _LibraryListScreenState extends ConsumerState<LibraryListScreen> {
                   if (activeReservation case final r?) ...[
                     SeatCard(
                       reservation: r,
+                      busy: seatActionBusy,
                       onReturn: () => handleLibseatReturn(context, ref, r),
                       onExtend: () => handleLibseatExtend(context, ref, r),
                     ),
@@ -163,6 +166,7 @@ class _LibraryListScreenState extends ConsumerState<LibraryListScreen> {
             _LibraryListAppBar(
               title: '열람실',
               refreshing: _refreshing,
+              onSettings: () => showLibseatReminderSettingsSheet(context, ref),
               onRefresh: () => _onRefresh(),
             ),
           ],
@@ -634,11 +638,13 @@ class _RoomCard extends StatelessWidget {
 class _LibraryListAppBar extends StatelessWidget {
   const _LibraryListAppBar({
     required this.title,
+    required this.onSettings,
     required this.onRefresh,
     required this.refreshing,
   });
 
   final String title;
+  final VoidCallback onSettings;
   final Future<void> Function() onRefresh;
   final bool refreshing;
 
@@ -651,6 +657,16 @@ class _LibraryListAppBar extends StatelessWidget {
       child: SejongSubAppBar(
         title: title,
         actions: [
+          IconButton(
+            tooltip: '열람실 알림 설정',
+            icon: const Icon(
+              Symbols.settings,
+              color: AppColors.secondary,
+              size: 22,
+            ),
+            onPressed: onSettings,
+            splashRadius: 22,
+          ),
           IconButton(
             tooltip: '새로고침',
             icon: refreshing

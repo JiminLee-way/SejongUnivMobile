@@ -115,6 +115,25 @@
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+
+        <!-- 열람실 좌석 알림 — Flutter isolate 없이 Android AlarmManager가 직접
+             notification을 띄운다. 앱 업데이트/재부팅 후에도 저장된 활성 좌석
+             snapshot 기준으로 미래 알림을 재등록한다. -->
+        <receiver
+            android:name=".libseat.LibseatAlarmReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".libseat.LibseatRescheduleReceiver"
+            android:exported="true"
+            android:enabled="true"
+            android:directBootAware="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

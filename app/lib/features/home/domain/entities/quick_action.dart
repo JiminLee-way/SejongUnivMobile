@@ -137,6 +137,21 @@ const kDefaultQuickActionKeys = <String>[
   'aca.classSchedule',
   'client.libraryFloors',
   'client.libseat',
+  'client.uCheckTab',
+  'client.sjpt',
+  'client.jiphyunCampus',
+  'client.studentIdTab',
+  'inf.notice.general',
+  'inf.universityLife.schoolCafeteria',
+];
+
+/// 1.0.10 기본 바로가기. 저장값이 이 순서 그대로면 사용자가 커스텀하지 않은
+/// 상태로 보고 현재 기본값으로 1회 승격한다.
+const kPreviousDefaultQuickActionKeys = <String>[
+  'inf.scheduleManagement',
+  'aca.classSchedule',
+  'client.libraryFloors',
+  'client.libseat',
   'inf.universityLife.schoolCafeteria',
   'client.sjpt',
   'client.jiphyunCampus',
@@ -164,6 +179,11 @@ const _legacyQuickActionKeyReplacements = <String, String>{
   'client.club': 'client.sjpt',
 };
 
+const _defaultQuickActionMigrationSources = <List<String>>[
+  kLegacyDefaultQuickActionKeys,
+  kPreviousDefaultQuickActionKeys,
+];
+
 /// 저장된 예전 바로가기 키를 현재 기본 구성으로 보정한다.
 ///
 /// 기존 설치에서 `client.club`이 로컬 저장소에 남아 있어도 홈 버튼은 새
@@ -185,8 +205,10 @@ List<String> normalizeQuickActionKeys(Iterable<String> keys) {
 /// 기본값으로 교체한다.
 List<String> migrateSavedQuickActionKeys(Iterable<String> keys) {
   final normalized = normalizeQuickActionKeys(keys);
-  if (_sameKeys(normalized, kLegacyDefaultQuickActionKeys)) {
-    return List<String>.from(kDefaultQuickActionKeys);
+  for (final previousDefault in _defaultQuickActionMigrationSources) {
+    if (_sameKeys(normalized, previousDefault)) {
+      return List<String>.from(kDefaultQuickActionKeys);
+    }
   }
   return normalized;
 }

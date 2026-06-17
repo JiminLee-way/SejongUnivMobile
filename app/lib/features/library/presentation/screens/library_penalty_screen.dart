@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
-import 'package:sejong_smart_campus/features/library/data/datasources/mock_library.dart';
+import 'package:sejong_smart_campus/features/libseat/presentation/providers/libseat_providers.dart';
 import 'package:sejong_smart_campus/features/library/domain/entities/library_models.dart';
 import 'package:sejong_smart_campus/core/theme/app_tokens.dart';
 import 'package:sejong_smart_campus/core/theme/app_typography.dart';
@@ -9,33 +10,38 @@ import 'package:sejong_smart_campus/shared/widgets/glass_card.dart';
 import 'package:sejong_smart_campus/shared/widgets/mesh_background.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_refresh.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_sub_app_bar.dart';
+import 'package:sejong_smart_campus/shared/widgets/shimmer.dart';
 import 'package:sejong_smart_campus/features/library/presentation/screens/library_list_screen.dart'
     show UsageHistoryRow;
 
+const int kPenaltyDaysPerUnreturned = 1;
+
 /// 미반납 누적 + 제재 정책 + 미반납 이력만 모아 보여주는 화면.
-class LibraryPenaltyScreen extends StatefulWidget {
+class LibraryPenaltyScreen extends ConsumerStatefulWidget {
   const LibraryPenaltyScreen({super.key});
 
   @override
-  State<LibraryPenaltyScreen> createState() => _LibraryPenaltyScreenState();
+  ConsumerState<LibraryPenaltyScreen> createState() =>
+      _LibraryPenaltyScreenState();
 }
 
-class _LibraryPenaltyScreenState extends State<LibraryPenaltyScreen> {
+class _LibraryPenaltyScreenState extends ConsumerState<LibraryPenaltyScreen> {
   Future<void> _onRefresh() async {
-    // TODO(data): 백엔드에서 제재 상태 재조회.
-    await Future<void>.delayed(const Duration(milliseconds: 1200));
-    if (!mounted) return;
-    setState(() {});
+    try {
+      await Future.wait<void>([
+        Future<void>.delayed(const Duration(milliseconds: 300)),
+        ref.refresh(seatUsageHistoryProvider.future),
+      ]);
+    } catch (_) {
+      // Provider가 에러 상태를 화면에 렌더링한다.
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final topPad = MediaQuery.paddingOf(context).top;
     final bottomPad = MediaQuery.paddingOf(context).bottom;
-    final unreturned = mockLibraryUsageHistory
-        .where((r) => r.status == LibraryUsageStatus.unreturned)
-        .toList();
-    final days = unreturned.length * kPenaltyDaysPerUnreturned;
+    final historyAsync = ref.watch(seatUsageHistoryProvider);
     return Scaffold(
       backgroundColor: AppColors.surface,
       extendBodyBehindAppBar: true,
@@ -55,61 +61,7 @@ class _LibraryPenaltyScreenState extends State<LibraryPenaltyScreen> {
                 physics: const AlwaysScrollableScrollPhysics(
                   parent: BouncingScrollPhysics(),
                 ),
-                children: [
-                  _PenaltySummaryCard(
-                    unreturnedCount: unreturned.length,
-                    penaltyDays: days,
-                  ),
-                  const SizedBox(height: 16),
-                  const _PolicyCard(),
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 2, bottom: 8),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Symbols.assignment_late,
-                          size: 18,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '미반납 내역 ${unreturned.length}건',
-                          style: AppTypography.headlineMd.copyWith(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  GlassCard(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4,
-                      vertical: 4,
-                    ),
-                    borderRadius: AppRadius.lg,
-                    child: Column(
-                      children: [
-                        for (int i = 0; i < unreturned.length; i++) ...[
-                          UsageHistoryRow(record: unreturned[i]),
-                          if (i != unreturned.length - 1)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                              child: Container(
-                                height: 1,
-                                color: AppColors.onSurface.withValues(
-                                  alpha: 0.06,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
+                children: _buildContent(historyAsync),
               ),
             ),
             const _PenaltyAppBar(),
@@ -117,6 +69,80 @@ class _LibraryPenaltyScreenState extends State<LibraryPenaltyScreen> {
         ),
       ),
     );
+  }
+
+  List<Widget> _buildContent(
+    AsyncValue<List<LibraryUsageRecord>> historyAsync,
+  ) {
+    if (historyAsync.isLoading && !historyAsync.hasValue) {
+      return const [_PenaltySkeleton()];
+    }
+
+    if (historyAsync.hasError && !historyAsync.hasValue) {
+      return [
+        _PenaltyErrorCard(onRetry: _onRefresh),
+        const SizedBox(height: 16),
+        const _PolicyCard(),
+      ];
+    }
+
+    final records = historyAsync.value ?? const <LibraryUsageRecord>[];
+    final unreturned = records
+        .where((r) => r.status == LibraryUsageStatus.unreturned)
+        .toList();
+    final days = unreturned.length * kPenaltyDaysPerUnreturned;
+
+    return [
+      _PenaltySummaryCard(
+        unreturnedCount: unreturned.length,
+        penaltyDays: days,
+      ),
+      const SizedBox(height: 16),
+      const _PolicyCard(),
+      const SizedBox(height: 16),
+      Padding(
+        padding: const EdgeInsets.only(left: 2, bottom: 8),
+        child: Row(
+          children: [
+            const Icon(
+              Symbols.assignment_late,
+              size: 18,
+              color: AppColors.primary,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '미반납 내역 ${unreturned.length}건',
+              style: AppTypography.headlineMd.copyWith(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+      if (unreturned.isEmpty)
+        const _PenaltyEmptyCard()
+      else
+        GlassCard(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          borderRadius: AppRadius.lg,
+          child: Column(
+            children: [
+              for (int i = 0; i < unreturned.length; i++) ...[
+                UsageHistoryRow(record: unreturned[i]),
+                if (i != unreturned.length - 1)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Container(
+                      height: 1,
+                      color: AppColors.onSurface.withValues(alpha: 0.06),
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+    ];
   }
 }
 
@@ -322,6 +348,226 @@ class _PolicyCard extends StatelessWidget {
             ),
             if (i != policies.length - 1) const SizedBox(height: 8),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PenaltySkeleton extends StatelessWidget {
+  const _PenaltySkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: Column(
+        children: const [
+          _PenaltySummarySkeleton(),
+          SizedBox(height: 16),
+          _PenaltyPolicySkeleton(),
+          SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: ShimmerBox(width: 120, height: 18, radius: 8),
+          ),
+          SizedBox(height: 8),
+          _PenaltyListSkeleton(),
+        ],
+      ),
+    );
+  }
+}
+
+class _PenaltySummarySkeleton extends StatelessWidget {
+  const _PenaltySummarySkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+      borderRadius: AppRadius.xl,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          Row(
+            children: [
+              ShimmerBox(width: 44, height: 44, radius: AppRadius.md),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ShimmerBox(width: 100, height: 18, radius: 8),
+                    SizedBox(height: 8),
+                    ShimmerBox(width: 150, height: 12, radius: 6),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(child: ShimmerBox(height: 52, radius: AppRadius.md)),
+              SizedBox(width: 14),
+              Expanded(child: ShimmerBox(height: 52, radius: AppRadius.md)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PenaltyPolicySkeleton extends StatelessWidget {
+  const _PenaltyPolicySkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      borderRadius: AppRadius.lg,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          ShimmerBox(width: 90, height: 18, radius: 8),
+          SizedBox(height: 14),
+          ShimmerBox(width: double.infinity, height: 14, radius: 7),
+          SizedBox(height: 10),
+          ShimmerBox(width: double.infinity, height: 14, radius: 7),
+          SizedBox(height: 10),
+          ShimmerBox(width: 260, height: 14, radius: 7),
+        ],
+      ),
+    );
+  }
+}
+
+class _PenaltyListSkeleton extends StatelessWidget {
+  const _PenaltyListSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      borderRadius: AppRadius.lg,
+      child: Column(
+        children: const [
+          _PenaltyHistorySkeletonRow(),
+          SizedBox(height: 16),
+          _PenaltyHistorySkeletonRow(),
+          SizedBox(height: 16),
+          _PenaltyHistorySkeletonRow(),
+        ],
+      ),
+    );
+  }
+}
+
+class _PenaltyHistorySkeletonRow extends StatelessWidget {
+  const _PenaltyHistorySkeletonRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: const [
+        ShimmerBox(width: 40, height: 40, radius: AppRadius.md),
+        SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ShimmerBox(width: 140, height: 16, radius: 8),
+              SizedBox(height: 8),
+              ShimmerBox(width: 210, height: 12, radius: 6),
+            ],
+          ),
+        ),
+        SizedBox(width: 12),
+        ShimmerBox(width: 54, height: 24, radius: AppRadius.full),
+      ],
+    );
+  }
+}
+
+class _PenaltyErrorCard extends StatelessWidget {
+  const _PenaltyErrorCard({required this.onRetry});
+
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+      borderRadius: AppRadius.xl,
+      child: Column(
+        children: [
+          Icon(
+            Symbols.error,
+            size: 34,
+            color: AppColors.primary.withValues(alpha: 0.85),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '미반납 내역을 불러오지 못했어요',
+            style: AppTypography.bodyMd.copyWith(
+              fontWeight: FontWeight.w800,
+              color: AppColors.onSurface,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '네트워크 상태를 확인한 뒤 다시 시도해 주세요',
+            textAlign: TextAlign.center,
+            style: AppTypography.labelMd.copyWith(
+              color: AppColors.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Symbols.refresh, size: 18),
+            label: const Text('다시 시도'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PenaltyEmptyCard extends StatelessWidget {
+  const _PenaltyEmptyCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+      borderRadius: AppRadius.lg,
+      child: Column(
+        children: [
+          Icon(
+            Symbols.check_circle,
+            size: 36,
+            fill: 1,
+            color: AppColors.secondary.withValues(alpha: 0.9),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '미반납 내역이 없어요',
+            style: AppTypography.bodyMd.copyWith(
+              fontWeight: FontWeight.w800,
+              color: AppColors.onSurface,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '현재 열람실 이용 제재 대상이 아닙니다',
+            style: AppTypography.labelMd.copyWith(
+              color: AppColors.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );

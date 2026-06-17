@@ -1,15 +1,17 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
-import 'package:sejong_smart_campus/features/timetable/data/datasources/mock_timetable.dart';
+import 'package:sejong_smart_campus/features/friends/presentation/providers/friend_timetable_providers.dart';
 import 'package:sejong_smart_campus/features/timetable/domain/entities/timetable_models.dart';
 import 'package:sejong_smart_campus/core/theme/app_subject_palette.dart';
 import 'package:sejong_smart_campus/core/theme/app_tokens.dart';
 import 'package:sejong_smart_campus/core/theme/app_typography.dart';
 import 'package:sejong_smart_campus/shared/widgets/glass_card.dart';
 import 'package:sejong_smart_campus/shared/widgets/mesh_background.dart';
+import 'package:sejong_smart_campus/shared/widgets/shimmer.dart';
 import 'package:sejong_smart_campus/features/timetable/presentation/widgets/timetable_grid.dart';
 
 /// 본인 + 선택한 친구들의 시간표를 비교해 "전원 공강 시간"을 찾는 화면.
@@ -21,7 +23,7 @@ import 'package:sejong_smart_campus/features/timetable/presentation/widgets/time
 /// ─ "함께 비는 시간" 카드 (긴 슬롯 우선 list)
 /// ─ 주간 가용성 그리드 (09–19시 × 월–금, 셀당 가용 인원 색상)
 /// ```
-class CommonFreeTimeScreen extends StatefulWidget {
+class CommonFreeTimeScreen extends ConsumerStatefulWidget {
   const CommonFreeTimeScreen({
     super.key,
     required this.ownTimetable,
@@ -32,10 +34,11 @@ class CommonFreeTimeScreen extends StatefulWidget {
   final List<Friend> selectedFriends;
 
   @override
-  State<CommonFreeTimeScreen> createState() => _CommonFreeTimeScreenState();
+  ConsumerState<CommonFreeTimeScreen> createState() =>
+      _CommonFreeTimeScreenState();
 }
 
-class _CommonFreeTimeScreenState extends State<CommonFreeTimeScreen> {
+class _CommonFreeTimeScreenState extends ConsumerState<CommonFreeTimeScreen> {
   late final List<Friend> _friends;
   bool _includeMe = true;
 
@@ -49,8 +52,45 @@ class _CommonFreeTimeScreenState extends State<CommonFreeTimeScreen> {
     setState(() => _friends.removeWhere((x) => x.id == f.id));
   }
 
+  _FriendScheduleResolution _resolveFriendSchedules() {
+    var loading = false;
+    final included = <_ResolvedFriendSchedule>[];
+    final excluded = <Friend>[];
+
+    for (final friend in _friends) {
+      final async = ref.watch(
+        friendTimetableProvider((
+          friendId: friend.id,
+          semester: widget.ownTimetable.semester,
+        )),
+      );
+      final timetable = async.value;
+      if (timetable != null) {
+        if (timetable.courses.isEmpty) {
+          excluded.add(friend);
+        } else {
+          included.add(_ResolvedFriendSchedule(courses: timetable.courses));
+        }
+        continue;
+      }
+      if (async.isLoading) {
+        loading = true;
+      } else {
+        excluded.add(friend);
+      }
+    }
+
+    return _FriendScheduleResolution(
+      loading: loading,
+      included: included,
+      excluded: excluded,
+    );
+  }
+
   /// 비교 대상 N명(본인 포함 옵션)의 강의 시간 일괄 — 알고리즘 입력.
-  List<List<CourseTime>> get _schedules {
+  List<List<CourseTime>> _buildSchedules(
+    List<_ResolvedFriendSchedule> included,
+  ) {
     final list = <List<CourseTime>>[];
     if (_includeMe) {
       list.add(
@@ -59,19 +99,27 @@ class _CommonFreeTimeScreenState extends State<CommonFreeTimeScreen> {
             .toList(growable: false),
       );
     }
-    for (final f in _friends) {
-      final courses = mockFriendTimetables[f.id] ?? const [];
-      list.add(courses.expand((c) => c.times).toList(growable: false));
+    for (final friend in included) {
+      list.add(friend.courses.expand((c) => c.times).toList(growable: false));
     }
     return list;
   }
 
-  int get _peopleCount => (_includeMe ? 1 : 0) + _friends.length;
+  int _peopleCount(List<_ResolvedFriendSchedule> included) =>
+      (_includeMe ? 1 : 0) + included.length;
+
+  int get _selectedPeopleCount => (_includeMe ? 1 : 0) + _friends.length;
 
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
-    final slots = _findCommonFreeSlots(_schedules);
+    final resolution = _resolveFriendSchedules();
+    final schedules = _buildSchedules(resolution.included);
+    final people = _peopleCount(resolution.included);
+    final count = resolution.loading ? _selectedPeopleCount : people;
+    final slots = resolution.loading
+        ? const <_FreeSlot>[]
+        : _findCommonFreeSlots(schedules);
     return Scaffold(
       backgroundColor: AppColors.surface,
       extendBodyBehindAppBar: true,
@@ -91,38 +139,89 @@ class _CommonFreeTimeScreenState extends State<CommonFreeTimeScreen> {
                     onRemoveFriend: _removeFriend,
                   ),
                 ),
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.marginMobile,
-                  ),
-                  sliver: SliverToBoxAdapter(
-                    child: _FreeSlotList(slots: slots, people: _peopleCount),
-                  ),
-                ),
-                const SliverToBoxAdapter(child: SizedBox(height: 16)),
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.marginMobile,
-                  ),
-                  sliver: SliverToBoxAdapter(
-                    child: _AvailabilityGrid(
-                      schedules: _schedules,
-                      people: _peopleCount,
+                if (!resolution.loading && resolution.excluded.isNotEmpty) ...[
+                  const SliverToBoxAdapter(child: SizedBox(height: 10)),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.marginMobile,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: _ExcludedFriendsNotice(
+                        count: resolution.excluded.length,
+                      ),
                     ),
                   ),
-                ),
+                ],
+                const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                if (resolution.loading)
+                  const SliverPadding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppSpacing.marginMobile,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: _CommonFreeTimeLoadingCards(),
+                    ),
+                  )
+                else if (people == 0)
+                  const SliverPadding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppSpacing.marginMobile,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: _NoComparablePeopleCard(),
+                    ),
+                  )
+                else ...[
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.marginMobile,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: _FreeSlotList(slots: slots, people: people),
+                    ),
+                  ),
+                  const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.marginMobile,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: _AvailabilityGrid(
+                        schedules: schedules,
+                        people: people,
+                      ),
+                    ),
+                  ),
+                ],
                 SliverPadding(
                   padding: EdgeInsets.only(bottom: 24 + mq.padding.bottom),
                 ),
               ],
             ),
-            _CommonFreeTimeAppBar(count: _peopleCount),
+            _CommonFreeTimeAppBar(count: count),
           ],
         ),
       ),
     );
   }
+}
+
+class _ResolvedFriendSchedule {
+  const _ResolvedFriendSchedule({required this.courses});
+
+  final List<Course> courses;
+}
+
+class _FriendScheduleResolution {
+  const _FriendScheduleResolution({
+    required this.loading,
+    required this.included,
+    required this.excluded,
+  });
+
+  final bool loading;
+  final List<_ResolvedFriendSchedule> included;
+  final List<Friend> excluded;
 }
 
 // ═════════════════════════════════════════════════════════════════════════
@@ -396,6 +495,143 @@ class _PersonChip extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ExcludedFriendsNotice extends StatelessWidget {
+  const _ExcludedFriendsNotice({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      borderRadius: AppRadius.lg,
+      child: Row(
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: const Icon(Symbols.info, size: 18, color: AppColors.primary),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '시간표가 없는 친구 $count명은 제외됐어요',
+              style: AppTypography.labelMd.copyWith(
+                fontSize: 13,
+                color: AppColors.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CommonFreeTimeLoadingCards extends StatelessWidget {
+  const _CommonFreeTimeLoadingCards();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: Column(
+        children: [
+          GlassCard(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                ShimmerBox(width: 140, height: 18, radius: 8),
+                SizedBox(height: 14),
+                _SkeletonLine(width: double.infinity),
+                SizedBox(height: 12),
+                _SkeletonLine(width: double.infinity),
+                SizedBox(height: 12),
+                _SkeletonLine(width: 220),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          GlassCard(
+            padding: EdgeInsets.fromLTRB(12, 12, 12, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                ShimmerBox(width: 120, height: 18, radius: 8),
+                SizedBox(height: 12),
+                SizedBox(
+                  height: 552,
+                  child: TimetableGridSkeleton(
+                    startHour: 9,
+                    endHour: 19,
+                    hourHeight: 52,
+                    timeAxisWidth: 32,
+                    headerHeight: 32,
+                    dayColWidth: 56,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkeletonLine extends StatelessWidget {
+  const _SkeletonLine({required this.width});
+
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return ShimmerBox(width: width, height: 44, radius: AppRadius.md);
+  }
+}
+
+class _NoComparablePeopleCard extends StatelessWidget {
+  const _NoComparablePeopleCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+      child: Column(
+        children: [
+          Icon(
+            Symbols.group_off,
+            size: 34,
+            color: AppColors.outline.withValues(alpha: 0.8),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            '계산할 시간표가 없어요',
+            style: AppTypography.bodyMd.copyWith(
+              fontWeight: FontWeight.w800,
+              color: AppColors.onSurface,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '나를 포함하거나 시간표를 공유한 친구를 선택해 주세요',
+            textAlign: TextAlign.center,
+            style: AppTypography.labelMd.copyWith(
+              color: AppColors.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -9,12 +9,12 @@ void main() {
         'aca.classSchedule',
         'client.libraryFloors',
         'client.libseat',
-        'inf.universityLife.schoolCafeteria',
+        'client.uCheckTab',
         'client.sjpt',
         'client.jiphyunCampus',
         'client.studentIdTab',
         'inf.notice.general',
-        'inf.notice.academic',
+        'inf.universityLife.schoolCafeteria',
       ]);
     });
 
@@ -33,6 +33,7 @@ void main() {
         const [],
       );
       final facilityRental = resolveQuickActionInfo('client.sjpt', const []);
+      final uCheck = resolveQuickActionInfo('client.uCheckTab', const []);
 
       expect(academicCalendar.label, '학사캘린더');
       expect(studentId.label, '학생증');
@@ -40,6 +41,7 @@ void main() {
       expect(generalNotice.label, '일반공지');
       expect(academicNotice.label, '학사공지');
       expect(facilityRental.label, '학교시설대여');
+      expect(uCheck.label, 'U-Check');
     });
 
     test('saved club shortcut is migrated to school facility rental', () {
@@ -64,6 +66,17 @@ void main() {
 
       expect(migrated, kDefaultQuickActionKeys);
     });
+
+    test(
+      'saved previous default shortcuts migrate to the new default order',
+      () {
+        final migrated = migrateSavedQuickActionKeys(
+          kPreviousDefaultQuickActionKeys,
+        );
+
+        expect(migrated, kDefaultQuickActionKeys);
+      },
+    );
 
     test('custom shortcut order is preserved when loading saved shortcuts', () {
       const saved = [

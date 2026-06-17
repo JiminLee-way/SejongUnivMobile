@@ -1,9 +1,11 @@
 package sejong.sejong_univ_station
 
 import sejong.sejong_univ_station.nfc.S1PassManager
+import sejong.sejong_univ_station.libseat.LibseatAlarmManager
 import android.app.ActivityManager
 import android.app.ApplicationExitInfo
 import android.content.Context
+import android.content.Intent
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -13,9 +15,12 @@ class MainActivity : FlutterActivity() {
     private val secureChannelName = "ac.sejong/secure_screen"
     private val s1passChannelName = "ac.sejong/s1pass"
     private val diagnosticsChannelName = "ac.sejong/diagnostics"
+    private val libseatAlarmsChannelName = "ac.sejong/libseat_alarms"
+    private var lastLibseatPayload: String? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        takeLibseatPayload(intent)?.let { lastLibseatPayload = it }
 
         // ─── FLAG_SECURE — 학생증 화면 스크린샷 차단 ───────────────────────
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, secureChannelName)
@@ -99,6 +104,69 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        // ─── Libseat reminders — Android native AlarmManager ────────────────
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, libseatAlarmsChannelName)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "scheduleLibseatAlarms" -> {
+                        try {
+                            val args = call.arguments as? Map<*, *>
+                                ?: throw IllegalArgumentException("snapshot arguments are missing")
+                            val snapshot = LibseatAlarmManager.snapshotFromMap(args)
+                            LibseatAlarmManager.schedule(applicationContext, snapshot)
+                            result.success(null)
+                        } catch (e: Exception) {
+                            result.error(
+                                "LIBSEAT_ALARM_SCHEDULE_FAILED",
+                                e.message ?: "Failed to schedule libseat alarms",
+                                null,
+                            )
+                        }
+                    }
+                    "cancelLibseatAlarms" -> {
+                        try {
+                            LibseatAlarmManager.cancel(applicationContext)
+                            result.success(null)
+                        } catch (e: Exception) {
+                            result.error(
+                                "LIBSEAT_ALARM_CANCEL_FAILED",
+                                e.message ?: "Failed to cancel libseat alarms",
+                                null,
+                            )
+                        }
+                    }
+                    "hasLibseatAlarms" -> {
+                        try {
+                            val args = call.arguments as? Map<*, *>
+                                ?: throw IllegalArgumentException("snapshot arguments are missing")
+                            val snapshot = LibseatAlarmManager.snapshotFromMap(args)
+                            result.success(
+                                LibseatAlarmManager.hasAllPending(applicationContext, snapshot),
+                            )
+                        } catch (e: Exception) {
+                            result.error(
+                                "LIBSEAT_ALARM_CHECK_FAILED",
+                                e.message ?: "Failed to check libseat alarms",
+                                null,
+                            )
+                        }
+                    }
+                    "getInitialLibseatPayload" -> {
+                        val payload = lastLibseatPayload ?: takeLibseatPayload(intent)
+                        lastLibseatPayload = null
+                        intent?.removeExtra(LibseatAlarmManager.EXTRA_NOTIFICATION_PAYLOAD)
+                        result.success(payload)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        takeLibseatPayload(intent)?.let { lastLibseatPayload = it }
     }
 
     private fun getRecentExitInfo(): List<Map<String, Any?>> {
@@ -138,5 +206,10 @@ class MainActivity : FlutterActivity() {
         ApplicationExitInfo.REASON_PACKAGE_STATE_CHANGE -> "REASON_PACKAGE_STATE_CHANGE"
         ApplicationExitInfo.REASON_PACKAGE_UPDATED -> "REASON_PACKAGE_UPDATED"
         else -> "REASON_$reason"
+    }
+
+    private fun takeLibseatPayload(source: Intent?): String? {
+        val payload = source?.getStringExtra(LibseatAlarmManager.EXTRA_NOTIFICATION_PAYLOAD)
+        return if (payload?.startsWith("libseat:") == true) payload else null
     }
 }

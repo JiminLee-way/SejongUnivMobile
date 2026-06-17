@@ -14,6 +14,7 @@ import 'package:sejong_smart_campus/core/theme/app_typography.dart';
 import 'package:sejong_smart_campus/shared/widgets/glass_card.dart';
 import 'package:sejong_smart_campus/shared/widgets/mesh_background.dart';
 import 'package:sejong_smart_campus/features/library/presentation/widgets/seat_map.dart';
+import 'package:sejong_smart_campus/features/library/presentation/widgets/libseat_reminder_settings_sheet.dart';
 
 /// 단일 열람실 좌석 현황 화면.
 ///
@@ -379,6 +380,8 @@ class _LibraryRoomScreenState extends ConsumerState<LibraryRoomScreen> {
                 _LibraryAppBar(
                   title: '열람실',
                   refreshing: _refreshing || initialLiveLoading,
+                  onSettings: () =>
+                      showLibseatReminderSettingsSheet(context, ref),
                   onRefresh: initialLiveFailed
                       ? () => _loadInitialLive()
                       : () => _refresh(showToast: true),
@@ -466,10 +469,12 @@ class _SeatMapLiveError extends StatelessWidget {
 class _LibraryAppBar extends StatelessWidget {
   const _LibraryAppBar({
     required this.title,
+    this.onSettings,
     this.onRefresh,
     this.refreshing = false,
   });
   final String title;
+  final VoidCallback? onSettings;
   final VoidCallback? onRefresh;
   final bool refreshing;
 
@@ -532,6 +537,26 @@ class _LibraryAppBar extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              Material(
+                color: Colors.transparent,
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: onSettings,
+                  child: const Tooltip(
+                    message: '열람실 알림 설정',
+                    child: Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Icon(
+                        Symbols.settings,
+                        size: 22,
+                        color: AppColors.secondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               Material(
                 color: Colors.transparent,
                 shape: const CircleBorder(),

@@ -12,10 +12,17 @@ import 'package:sejong_smart_campus/shared/widgets/glass_card.dart';
 import 'package:sejong_smart_campus/shared/widgets/mesh_background.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_refresh.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_sub_app_bar.dart';
+import 'package:sejong_smart_campus/shared/widgets/shimmer.dart';
 
 class NoticesScreen extends ConsumerStatefulWidget {
-  const NoticesScreen({super.key, this.initial = NoticeCategory.general});
+  const NoticesScreen({
+    super.key,
+    this.initial = NoticeCategory.general,
+    this.showBack = true,
+  });
+
   final NoticeCategory initial;
+  final bool showBack;
 
   @override
   ConsumerState<NoticesScreen> createState() => _NoticesScreenState();
@@ -25,8 +32,14 @@ class _NoticesScreenState extends ConsumerState<NoticesScreen> {
   late NoticeCategory _category = widget.initial;
 
   Future<void> _onRefresh() async {
-    ref.invalidate(noticesByCategoryProvider(_category));
-    await Future<void>.delayed(const Duration(milliseconds: 400));
+    try {
+      await Future.wait([
+        Future<void>.delayed(const Duration(milliseconds: 300)),
+        ref.refresh(noticesByCategoryProvider(_category).future),
+      ]);
+    } catch (_) {
+      // Provider error state is rendered by the screen; refresh control should end.
+    }
   }
 
   void _openNotice(SejongNoticeItem item) {
@@ -71,8 +84,7 @@ class _NoticesScreenState extends ConsumerState<NoticesScreen> {
                     ),
                     const SliverToBoxAdapter(child: SizedBox(height: 8)),
                     async.when(
-                      loading: () =>
-                          const SliverToBoxAdapter(child: _CenterSpinner()),
+                      loading: () => const _NoticeListSkeleton(),
                       error: (_, _) => SliverToBoxAdapter(
                         child: _ErrorBox(onRetry: _onRefresh),
                       ),
@@ -106,7 +118,10 @@ class _NoticesScreenState extends ConsumerState<NoticesScreen> {
                 ),
               ),
             ),
-            const Align(alignment: Alignment.topCenter, child: _NoticeAppBar()),
+            Align(
+              alignment: Alignment.topCenter,
+              child: _NoticeAppBar(showBack: widget.showBack),
+            ),
           ],
         ),
       ),
@@ -115,9 +130,11 @@ class _NoticesScreenState extends ConsumerState<NoticesScreen> {
 }
 
 class _NoticeAppBar extends StatelessWidget {
-  const _NoticeAppBar();
+  const _NoticeAppBar({required this.showBack});
+  final bool showBack;
   @override
-  Widget build(BuildContext context) => const SejongSubAppBar(title: '대학 공지');
+  Widget build(BuildContext context) =>
+      SejongSubAppBar(title: '공지', showBack: showBack);
 }
 
 class _CategoryStrip extends StatelessWidget {
@@ -325,22 +342,65 @@ class _NoticeRow extends StatelessWidget {
   }
 }
 
-class _CenterSpinner extends StatelessWidget {
-  const _CenterSpinner();
+class _NoticeListSkeleton extends StatelessWidget {
+  const _NoticeListSkeleton();
+
   @override
-  Widget build(BuildContext context) => const Padding(
-    padding: EdgeInsets.symmetric(vertical: 64),
-    child: Center(
-      child: SizedBox(
-        width: 22,
-        height: 22,
-        child: CircularProgressIndicator(
-          strokeWidth: 2.4,
-          color: AppColors.primary,
+  Widget build(BuildContext context) {
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.marginMobile,
+        8,
+        AppSpacing.marginMobile,
+        0,
+      ),
+      sliver: SliverList.separated(
+        itemCount: 6,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (_, _) => const _NoticeRowSkeleton(),
+      ),
+    );
+  }
+}
+
+class _NoticeRowSkeleton extends StatelessWidget {
+  const _NoticeRowSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      borderRadius: AppRadius.lg,
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Shimmer(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                ShimmerBox(width: 52, height: 18, radius: AppRadius.full),
+                SizedBox(width: 6),
+                ShimmerBox(width: 26, height: 18, radius: AppRadius.full),
+              ],
+            ),
+            const SizedBox(height: 10),
+            const ShimmerBox(width: double.infinity, height: 15),
+            const SizedBox(height: 6),
+            const ShimmerBox(width: 230, height: 15),
+            const SizedBox(height: 12),
+            Row(
+              children: const [
+                ShimmerBox(width: 72, height: 11),
+                Spacer(),
+                ShimmerBox(width: 54, height: 11),
+                SizedBox(width: 8),
+                ShimmerBox(width: 32, height: 11),
+              ],
+            ),
+          ],
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _EmptyBox extends StatelessWidget {

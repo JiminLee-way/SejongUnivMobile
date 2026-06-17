@@ -43,6 +43,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 1));
 
+    expect(find.byTooltip('열람실 알림 설정'), findsOneWidget);
     expect(roomFetches, 2);
 
     entryRefreshRooms.complete(const [

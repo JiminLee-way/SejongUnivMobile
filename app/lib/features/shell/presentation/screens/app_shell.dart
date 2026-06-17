@@ -22,9 +22,10 @@ import 'package:sejong_smart_campus/shared/widgets/mesh_background.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_dialog.dart';
 import 'package:sejong_smart_campus/features/shell/presentation/widgets/bottom_nav_insets.dart';
 import 'package:sejong_smart_campus/features/shell/presentation/widgets/sejong_bottom_nav.dart';
-import 'package:sejong_smart_campus/features/community/presentation/screens/community_screen.dart';
 import 'package:sejong_smart_campus/features/home/presentation/screens/home_screen.dart';
 import 'package:sejong_smart_campus/features/menu/presentation/screens/services_screen.dart';
+import 'package:sejong_smart_campus/features/notices/domain/entities/notice_models.dart';
+import 'package:sejong_smart_campus/features/notices/presentation/screens/notices_screen.dart';
 import 'package:sejong_smart_campus/features/student_id/presentation/screens/student_id_screen.dart';
 import 'package:sejong_smart_campus/features/ucheck/presentation/screens/ucheck_screen.dart';
 
@@ -327,6 +328,7 @@ class _AppShellState extends ConsumerState<AppShell>
       // 비동기 경로의 provider 접근은 deactivation-safe한 _container로 — 위 initState
       // 주석 참조(로그아웃/계정전환 중 ref는 "deactivated ancestor"로 throw 가능).
       unawaited(handleAppResume(_container, pauseDuration: pauseDuration));
+      unawaited(_handlePendingNativeLibseatPayload());
       // 복귀 시 받은 친구요청 확인 + 폴링 재개.
       _startFriendPoll();
     } else if (state == AppLifecycleState.paused ||
@@ -334,6 +336,13 @@ class _AppShellState extends ConsumerState<AppShell>
       _pausedAt ??= DateTime.now();
       _stopFriendPoll();
     }
+  }
+
+  Future<void> _handlePendingNativeLibseatPayload() async {
+    final payload = await LibseatNotifications.instance
+        .takeNativeLaunchPayload();
+    if (payload == null || !mounted) return;
+    await _handleLibseatNotificationPayload(payload);
   }
 
   /// 외부에서 탭 전환 요청 (AppShell.of(context).switchTab(i)).
@@ -418,8 +427,8 @@ class _AppShellState extends ConsumerState<AppShell>
   }
 
   void _onNavTap(int i) {
-    // SejongBottomNav._items 4개로 축소:
-    //   0: 메인 / 1: 학생증 / 2: 커뮤니티 / 3: 전체(endDrawer 토글).
+    // SejongBottomNav._items 4개:
+    //   0: 메인 / 1: 학생증 / 2: 공지 / 3: 전체(endDrawer 토글).
     // U-Check는 nav 탭이 아니라 push되는 sub-screen.
     if (i == 3) {
       final scaffold = _scaffoldKey.currentState;
@@ -439,7 +448,10 @@ class _AppShellState extends ConsumerState<AppShell>
     final page = switch (i) {
       0 => const HomeScreen(),
       1 => const StudentIdScreen(),
-      2 => const CommunityScreen(),
+      2 => const NoticesScreen(
+        initial: NoticeCategory.general,
+        showBack: false,
+      ),
       _ => const HomeScreen(),
     };
     // 기존 스택을 모두 비우고 새 탭 루트를 즉시 교체

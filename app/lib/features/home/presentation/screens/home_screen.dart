@@ -7,6 +7,7 @@ import 'package:material_symbols_icons/symbols.dart';
 import 'package:sejong_smart_campus/features/home/domain/entities/event_card.dart';
 import 'package:sejong_smart_campus/features/home/presentation/providers/home_events_providers.dart';
 import 'package:sejong_smart_campus/features/home_widgets/presentation/providers/home_widgets_providers.dart';
+import 'package:sejong_smart_campus/features/app_update/presentation/widgets/recommended_update_home_prompt.dart';
 import 'package:sejong_smart_campus/features/libseat/presentation/providers/libseat_providers.dart';
 import 'package:sejong_smart_campus/features/library/presentation/widgets/seat_card.dart';
 import 'package:sejong_smart_campus/core/routing/app_page_route.dart';
@@ -232,6 +233,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ).push(slideRoute(const NotificationsScreen())),
             ),
           ),
+          const RecommendedUpdateHomePrompt(),
         ],
       ),
     );
@@ -247,9 +249,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   ) {
     final seat = ref.watch(activeSeatReservationProvider);
     if (seat == null) return null;
+    final seatActionBusy = ref.watch(libseatSeatActionStateProvider).busy;
     return (ctx) => SeatCard(
       reservation: seat,
       header: LectureContextRow(state: lectureState, next: next),
+      busy: seatActionBusy,
       onReturn: () => handleLibseatReturn(ctx, ref, seat),
       onExtend: () => handleLibseatExtend(ctx, ref, seat),
     );

@@ -8,6 +8,7 @@ import 'package:sejong_smart_campus/core/theme/app_tokens.dart';
 import 'package:sejong_smart_campus/core/theme/app_typography.dart';
 import 'package:sejong_smart_campus/features/library/domain/entities/seat_reservation.dart';
 import 'package:sejong_smart_campus/shared/widgets/glass_card.dart';
+import 'package:sejong_smart_campus/shared/widgets/shimmer.dart';
 
 /// 좌석 예약 카드 — 홈/도서관 양쪽에서 동일 디자인으로 사용.
 ///
@@ -23,9 +24,11 @@ class SeatCard extends StatelessWidget {
     this.header,
     this.onReturn,
     this.onExtend,
+    this.busy = false,
   });
   final SeatReservation reservation;
   final Widget? header;
+  final bool busy;
 
   /// 반납 버튼 핸들러. null이면 버튼이 비활성(탭 무시).
   final VoidCallback? onReturn;
@@ -134,17 +137,27 @@ class SeatCard extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 2),
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: _CountdownText(reservation: reservation),
-                              ),
+                              busy
+                                  ? const _CountdownSkeleton()
+                                  : FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: _CountdownText(
+                                        reservation: reservation,
+                                      ),
+                                    ),
                             ],
                           ),
                         ),
-                        _OutlinedButton(label: '반납', onTap: onReturn),
+                        _OutlinedButton(
+                          label: '반납',
+                          onTap: busy ? null : onReturn,
+                        ),
                         const SizedBox(width: 8),
-                        _PrimaryButton(label: '연장', onTap: onExtend),
+                        _PrimaryButton(
+                          label: '연장',
+                          onTap: busy ? null : onExtend,
+                        ),
                       ],
                     ),
                   ],
@@ -197,6 +210,18 @@ class _CountdownTextState extends State<_CountdownText> {
       _format(widget.reservation.remaining(DateTime.now())),
       style: AppTypography.timer,
       maxLines: 1,
+    );
+  }
+}
+
+class _CountdownSkeleton extends StatelessWidget {
+  const _CountdownSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.only(top: 4, bottom: 2),
+      child: Shimmer(child: ShimmerBox(width: 150, height: 34, radius: 10)),
     );
   }
 }

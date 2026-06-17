@@ -12,6 +12,7 @@ import 'package:sejong_smart_campus/shared/widgets/glass_card.dart';
 import 'package:sejong_smart_campus/shared/widgets/mesh_background.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_refresh.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_sub_app_bar.dart';
+import 'package:sejong_smart_campus/shared/widgets/shimmer.dart';
 
 /// 공지/뉴스 통합 상세 화면.
 ///
@@ -54,25 +55,22 @@ class NoticeDetailScreen extends ConsumerWidget {
                   ? _DetailBody(detail: injected)
                   : SejongRefresh(
                       onRefresh: () async {
-                        ref.invalidate(noticeDetailProvider(arg!));
-                        await Future<void>.delayed(
-                          const Duration(milliseconds: 400),
-                        );
+                        try {
+                          await Future.wait([
+                            Future<void>.delayed(
+                              const Duration(milliseconds: 300),
+                            ),
+                            ref.refresh(noticeDetailProvider(arg!).future),
+                          ]);
+                        } catch (_) {
+                          // Error state is rendered by the provider branch.
+                        }
                       },
                       topInset: mq.padding.top + 64,
                       child: ref
                           .watch(noticeDetailProvider(arg!))
                           .when(
-                            loading: () => const Center(
-                              child: SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2.4,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ),
+                            loading: () => const _NoticeDetailSkeleton(),
                             error: (e, _) => _ErrorView(error: e),
                             data: (detail) => _DetailBody(detail: detail),
                           ),
@@ -278,6 +276,10 @@ class _CoverImage extends StatelessWidget {
         child: Image.network(
           url,
           fit: BoxFit.cover,
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return const _ImageSkeleton();
+          },
           errorBuilder: (_, _, _) => Container(
             color: AppColors.surfaceContainerHigh,
             alignment: Alignment.center,
@@ -523,6 +525,123 @@ class _AttachmentRowState extends State<_AttachmentRow> {
       'zip' || 'rar' || '7z' => const Color(0xFF7C3AED),
       _ => AppColors.onSurfaceVariant,
     };
+  }
+}
+
+class _NoticeDetailSkeleton extends StatelessWidget {
+  const _NoticeDetailSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    return ListView(
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.marginMobile,
+        mq.padding.top + 64 + 8,
+        AppSpacing.marginMobile,
+        120 + mq.padding.bottom,
+      ),
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      children: const [
+        _HeaderCardSkeleton(),
+        SizedBox(height: 12),
+        ClipRRect(
+          borderRadius: BorderRadius.all(Radius.circular(AppRadius.lg)),
+          child: AspectRatio(aspectRatio: 16 / 9, child: _ImageSkeleton()),
+        ),
+        SizedBox(height: 12),
+        _ContentCardSkeleton(),
+      ],
+    );
+  }
+}
+
+class _HeaderCardSkeleton extends StatelessWidget {
+  const _HeaderCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      borderRadius: AppRadius.lg,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Shimmer(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Row(
+              children: [
+                ShimmerBox(width: 52, height: 20, radius: AppRadius.full),
+                SizedBox(width: 6),
+                ShimmerBox(width: 32, height: 20, radius: AppRadius.full),
+              ],
+            ),
+            SizedBox(height: 14),
+            ShimmerBox(width: double.infinity, height: 18),
+            SizedBox(height: 8),
+            ShimmerBox(width: 250, height: 18),
+            SizedBox(height: 14),
+            Row(
+              children: [
+                ShimmerBox(width: 78, height: 12),
+                SizedBox(width: 10),
+                ShimmerBox(width: 84, height: 12),
+                Spacer(),
+                ShimmerBox(width: 38, height: 12),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ContentCardSkeleton extends StatelessWidget {
+  const _ContentCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      borderRadius: AppRadius.lg,
+      padding: const EdgeInsets.fromLTRB(14, 16, 14, 14),
+      child: Shimmer(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            ShimmerBox(width: double.infinity, height: 13),
+            SizedBox(height: 10),
+            ShimmerBox(width: double.infinity, height: 13),
+            SizedBox(height: 10),
+            ShimmerBox(width: 260, height: 13),
+            SizedBox(height: 20),
+            ShimmerBox(width: double.infinity, height: 13),
+            SizedBox(height: 10),
+            ShimmerBox(width: 220, height: 13),
+            SizedBox(height: 10),
+            ShimmerBox(width: double.infinity, height: 13),
+            SizedBox(height: 10),
+            ShimmerBox(width: 180, height: 13),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ImageSkeleton extends StatelessWidget {
+  const _ImageSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer(
+      child: Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: AppColors.surfaceContainerHigh,
+      ),
+    );
   }
 }
 

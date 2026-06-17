@@ -117,11 +117,9 @@ bool routeByKey(
       return true;
     case 'client.communityTab':
     case 'client.communityTab.switch':
-      // 커뮤니티는 nav 탭(index 2)이다. 전체서비스에서 standalone push하면
-      // CommunityScreen이 투명 Scaffold(자체 MeshBackground 없음)라 opaque
-      // route 위에서 검은 배경으로 보였고(탭 화면이라 뒤로가기 버튼도 없어
-      // 갇힘), AppShell의 MeshBackground는 push된 route 아래에 있어 비치지
-      // 않았다. 그래서 standalone push 대신 **탭 전환**한다(드로어면 닫고).
+      // 커뮤니티는 nav 탭(index 2)이다. 탭 루트는 실제 대학 공지
+      // NoticesScreen이므로 전체서비스/바로가기에서도 standalone push 대신
+      // 같은 탭으로 전환한다(드로어면 닫고).
       _switchTab(context, 2);
       return true;
     case 'client.studentIdTab':

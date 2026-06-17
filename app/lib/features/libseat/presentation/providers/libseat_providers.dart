@@ -7,6 +7,7 @@ import 'package:sejong_smart_campus/features/auth/presentation/providers/auth_pr
 import 'package:sejong_smart_campus/features/libseat/data/datasources/libseat_notification_state_local.dart';
 import 'package:sejong_smart_campus/features/libseat/data/datasources/facility_remote.dart';
 import 'package:sejong_smart_campus/features/libseat/data/datasources/libseat_notifications.dart';
+import 'package:sejong_smart_campus/features/libseat/data/datasources/libseat_reminder_settings_local.dart';
 import 'package:sejong_smart_campus/features/libseat/data/datasources/libseat_remote.dart';
 import 'package:sejong_smart_campus/features/libseat/domain/entities/facility_models.dart';
 import 'package:sejong_smart_campus/features/libseat/domain/entities/libseat_models.dart';
@@ -366,14 +367,15 @@ class _SeatOverride extends Notifier<({MySeat? value})?> {
     ref.listen(mySeatProvider, (prev, next) {
       final ov = state;
       if (ov == null || !next.hasValue || next.isLoading) return;
-      final serverHasSeat = next.value != null;
-      final overrideWantsSeat = ov.value != null;
-      if (serverHasSeat == overrideWantsSeat) {
+      final overrideSeat = ov.value;
+      final serverSeat = next.value;
+      final canHandOff = overrideSeat == null
+          ? serverSeat == null
+          : serverSeat != null &&
+                _hasSameActiveSeatSchedule(serverSeat, overrideSeat);
+      if (canHandOff) {
         // ignore: avoid_print
-        print(
-          '[LIBSEAT] override.autoClear (server settled '
-          'hasSeat=$serverHasSeat == intent) -> 서버값 인계',
-        );
+        print('[LIBSEAT] override.autoClear -> 서버값 인계');
         state = null;
       }
     });
@@ -398,6 +400,13 @@ class _SeatOverride extends Notifier<({MySeat? value})?> {
 
 final seatOverrideProvider =
     NotifierProvider<_SeatOverride, ({MySeat? value})?>(_SeatOverride.new);
+
+bool _hasSameActiveSeatSchedule(MySeat a, MySeat b) {
+  return a.roomNo == b.roomNo &&
+      a.seatNo == b.seatNo &&
+      a.startedAt.isAtSameMomentAs(b.startedAt) &&
+      a.expiresAt.isAtSameMomentAs(b.expiresAt);
+}
 
 /// 홈/도서관 화면에서 즉시 쓸 수 있는 [SeatReservation] 형태로 변환.
 ///
@@ -426,9 +435,46 @@ final libseatNotificationStateLocalProvider =
       (_) => LibseatNotificationStateLocal(),
     );
 
+final libseatReminderSettingsLocalProvider =
+    Provider<LibseatReminderSettingsLocal>(
+      (_) => LibseatReminderSettingsLocal(),
+    );
+
+final libseatReminderSettingsProvider = FutureProvider<LibseatReminderSettings>(
+  (ref) => ref.watch(libseatReminderSettingsLocalProvider).read(),
+);
+
 final libseatSyncProvider = Provider<LibseatSync>(
   (ref) => LibseatSyncService(ref),
 );
+
+class LibseatSeatActionState {
+  const LibseatSeatActionState({
+    this.busy = false,
+    this.expectNoSeat = false,
+    this.expectExpiresAfter,
+  });
+
+  static const idle = LibseatSeatActionState();
+
+  final bool busy;
+  final bool expectNoSeat;
+  final DateTime? expectExpiresAfter;
+}
+
+class _LibseatSeatActionStateNotifier extends Notifier<LibseatSeatActionState> {
+  @override
+  LibseatSeatActionState build() => LibseatSeatActionState.idle;
+
+  void setAction(LibseatSeatActionState value) => state = value;
+
+  void clear() => state = LibseatSeatActionState.idle;
+}
+
+final libseatSeatActionStateProvider =
+    NotifierProvider<_LibseatSeatActionStateNotifier, LibseatSeatActionState>(
+      _LibseatSeatActionStateNotifier.new,
+    );
 
 abstract class LibseatSync {
   Future<LibseatSyncResult> sync({
@@ -484,6 +530,7 @@ class LibseatSyncService implements LibseatSync {
         _ref.read(seatOverrideProvider.notifier).hide();
         await LibseatNotifications.instance.cancelAll();
         await local.clearSnapshot();
+        _settleSeatActionState(null);
         if (notificationPayloadKey != null &&
             !await local.hasAcknowledgedReturn(notificationPayloadKey)) {
           await local.acknowledgeReturn(notificationPayloadKey);
@@ -493,14 +540,32 @@ class LibseatSyncService implements LibseatSync {
       } else {
         _ref.read(seatOverrideProvider.notifier).show(seat);
         final snapshot = LibseatReservationSnapshot.fromMySeat(seat);
+        final reminderSettings = await _ref.read(
+          libseatReminderSettingsProvider.future,
+        );
         final previous = previousState.current;
-        if (previous == null || !previous.hasSameSchedule(snapshot)) {
-          await LibseatNotifications.instance.scheduleForSeat(
-            seat,
-            promptExactAlarm: _shouldPromptExactAlarm(reason),
-          );
+        final sameSnapshot =
+            previous != null && previous.hasSameSchedule(snapshot);
+        if (!reminderSettings.hasAnyEnabled) {
+          await LibseatNotifications.instance.cancelAll();
           await local.saveSnapshot(snapshot);
+        } else {
+          final hasPendingAlarms = sameSnapshot
+              ? await LibseatNotifications.instance.hasAllPendingForSeat(
+                  seat,
+                  settings: reminderSettings,
+                )
+              : false;
+          if (!sameSnapshot || !hasPendingAlarms) {
+            await LibseatNotifications.instance.scheduleForSeat(
+              seat,
+              promptExactAlarm: _shouldPromptExactAlarm(reason),
+              settings: reminderSettings,
+            );
+            await local.saveSnapshot(snapshot);
+          }
         }
+        _settleSeatActionState(seat);
       }
 
       await _refreshViews(seat: seat, visibleRoomNo: visibleRoomNo);
@@ -512,6 +577,21 @@ class LibseatSyncService implements LibseatSync {
       );
     } catch (e) {
       return LibseatSyncResult(reason: reason, error: e);
+    }
+  }
+
+  void _settleSeatActionState(MySeat? seat) {
+    final action = _ref.read(libseatSeatActionStateProvider);
+    if (!action.busy) return;
+    if (action.expectNoSeat && seat == null) {
+      _ref.read(libseatSeatActionStateProvider.notifier).clear();
+      return;
+    }
+    final expectExpiresAfter = action.expectExpiresAfter;
+    if (expectExpiresAfter != null &&
+        seat != null &&
+        seat.expiresAt.isAfter(expectExpiresAfter)) {
+      _ref.read(libseatSeatActionStateProvider.notifier).clear();
     }
   }
 
@@ -675,6 +755,7 @@ Future<LibseatResult> extendLibseat(
   WidgetRef ref, {
   required int roomNo,
   required String seatNo,
+  DateTime? previousExpiresAt,
 }) async {
   final user = ref.read(currentUserProvider);
   final userId = user?.userId ?? '';
@@ -686,13 +767,30 @@ Future<LibseatResult> extendLibseat(
   );
   if (r.success) {
     // 새 종료시간을 알아야 알림을 재예약 + 타이머가 갱신되므로 재조회.
-    final mine = await _fetchMySeatBounded(remote, tries: 3);
+    final mine = await _fetchMySeatBounded(
+      remote,
+      tries: 6,
+      accept: previousExpiresAt == null
+          ? null
+          : (seat) => seat.expiresAt.isAfter(previousExpiresAt),
+    );
     // 연장된 새 종료시간을 카드/타이머에 즉시 반영.
-    if (mine != null) ref.read(seatOverrideProvider.notifier).show(mine);
+    if (mine != null) {
+      ref.read(seatOverrideProvider.notifier).show(mine);
+    }
     final sync = await ref
         .read(libseatSyncProvider)
         .sync(reason: 'extend', visibleRoomNo: roomNo);
-    final syncedSeat = sync.seat ?? mine;
+    final syncSeat = sync.seat;
+    final syncedSeat =
+        (syncSeat != null &&
+            (previousExpiresAt == null ||
+                syncSeat.expiresAt.isAfter(previousExpiresAt)))
+        ? syncSeat
+        : mine;
+    if (syncedSeat != null) {
+      ref.read(seatOverrideProvider.notifier).show(syncedSeat);
+    }
     await _appendHistory(
       ref,
       roomLabel: '좌석 연장 · ${syncedSeat?.roomName ?? '열람실 $roomNo · $seatNo번'}',
@@ -725,9 +823,28 @@ Future<void> handleLibseatReturn(
     confirmLabel: '반납',
   );
   if (!ok || !context.mounted) return;
-  final r = await returnLibseat(ref, roomNo: roomNo, seatNo: seatNo);
-  if (!context.mounted) return;
-  await showLibseatResultDialog(context, r, successTitle: '반납 완료');
+  _setSeatActionState(
+    ref,
+    const LibseatSeatActionState(busy: true, expectNoSeat: true),
+  );
+  var success = false;
+  try {
+    final r = await returnLibseat(ref, roomNo: roomNo, seatNo: seatNo);
+    success = r.success;
+    if (context.mounted) {
+      await showLibseatResultDialog(context, r, successTitle: '반납 완료');
+    }
+    if (success) {
+      await _refreshAfterLibseatSeatAction(
+        ref,
+        reason: 'returnAfterDialog',
+        roomNo: roomNo,
+        expectNoSeat: true,
+      );
+    }
+  } finally {
+    if (!success) _setSeatActionState(ref, LibseatSeatActionState.idle);
+  }
 }
 
 /// 연장 버튼 — 정책(종료 120분 전부터) 선검사 후 [extendLibseat] 호출.
@@ -754,9 +871,78 @@ Future<void> handleLibseatExtend(
     confirmLabel: '연장',
   );
   if (!ok || !context.mounted) return;
-  final r = await extendLibseat(ref, roomNo: roomNo, seatNo: seatNo);
-  if (!context.mounted) return;
-  await showLibseatResultDialog(context, r, successTitle: '연장 완료');
+  _setSeatActionState(
+    ref,
+    LibseatSeatActionState(
+      busy: true,
+      expectExpiresAfter: reservation.expiresAt,
+    ),
+  );
+  var success = false;
+  try {
+    final r = await extendLibseat(
+      ref,
+      roomNo: roomNo,
+      seatNo: seatNo,
+      previousExpiresAt: reservation.expiresAt,
+    );
+    success = r.success;
+    if (context.mounted) {
+      await showLibseatResultDialog(context, r, successTitle: '연장 완료');
+    }
+    if (success) {
+      await _refreshAfterLibseatSeatAction(
+        ref,
+        reason: 'extendAfterDialog',
+        roomNo: roomNo,
+      );
+    }
+  } finally {
+    if (!success) _setSeatActionState(ref, LibseatSeatActionState.idle);
+  }
+}
+
+void _setSeatActionState(WidgetRef ref, LibseatSeatActionState state) {
+  try {
+    if (state.busy) {
+      ref.read(libseatSeatActionStateProvider.notifier).setAction(state);
+    } else {
+      ref.read(libseatSeatActionStateProvider.notifier).clear();
+    }
+  } catch (_) {
+    // Caller widget may have been disposed while the native request was running.
+  }
+}
+
+Future<void> _refreshAfterLibseatSeatAction(
+  WidgetRef ref, {
+  required String reason,
+  required int roomNo,
+  bool expectNoSeat = false,
+}) async {
+  ref.invalidate(mySeatProvider);
+  ref.invalidate(roomListProvider);
+  ref.invalidate(seatMapProvider(roomNo));
+  ref.invalidate(usageHistoryProvider);
+  ref.invalidate(seatUsageHistoryProvider);
+
+  await Future.wait<void>([
+    ref
+        .read(libseatSyncProvider)
+        .sync(reason: reason, visibleRoomNo: roomNo, expectNoSeat: expectNoSeat)
+        .then<void>((_) {}),
+    _ignoreRefresh(ref.read(mySeatProvider.future)),
+    _ignoreRefresh(ref.read(roomListProvider.future)),
+    _ignoreRefresh(ref.read(seatUsageHistoryProvider.future)),
+  ]);
+}
+
+Future<void> _ignoreRefresh(Future<Object?> future) async {
+  try {
+    await future.timeout(const Duration(seconds: 8));
+  } catch (_) {
+    // Provider widgets render their own error states; action sync state remains.
+  }
 }
 
 // ─── 이용 내역 (실 libseat 이력 우선) ───────────────────────────────────────
@@ -848,11 +1034,12 @@ Future<MySeat?> _fetchMySeatBounded(
   LibseatRemote remote, {
   int tries = 4,
   Duration gap = const Duration(milliseconds: 500),
+  bool Function(MySeat seat)? accept,
 }) async {
   for (var i = 0; i < tries; i++) {
     try {
       final m = await remote.fetchMySeat();
-      if (m != null) return m;
+      if (m != null && (accept == null || accept(m))) return m;
     } catch (_) {
       // 네트워크 일시 오류 — 다음 시도로.
     }

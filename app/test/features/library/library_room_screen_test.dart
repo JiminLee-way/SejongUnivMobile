@@ -74,6 +74,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 20));
 
+    expect(find.byTooltip('열람실 알림 설정'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('room-header-count-skeleton')),
       findsOneWidget,

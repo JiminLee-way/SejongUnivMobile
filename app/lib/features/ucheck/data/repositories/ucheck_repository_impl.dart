@@ -15,6 +15,14 @@ import 'package:sejong_smart_campus/features/ucheck/domain/entities/ucheck_mobil
 import 'package:sejong_smart_campus/features/ucheck/domain/entities/ucheck_objection.dart';
 import 'package:sejong_smart_campus/features/ucheck/domain/repositories/ucheck_repository.dart';
 
+String ucheckFailureReasonForServerCode(String code) {
+  final normalized = code.trim();
+  if (normalized.contains('attendance_not_time')) {
+    return '출석 체크 시간이 아닙니다.';
+  }
+  return normalized.isEmpty ? '서버 응답 오류' : '서버 거절: $normalized';
+}
+
 class UCheckRepositoryImpl implements UCheckRepository {
   UCheckRepositoryImpl({
     required this.client,
@@ -439,7 +447,7 @@ class UCheckRepositoryImpl implements UCheckRepository {
         }
         return FailedOutcome(
           lectureName: name,
-          reason: code.isEmpty ? '서버 응답 오류' : '서버 거절: $code',
+          reason: ucheckFailureReasonForServerCode(code),
         );
     }
   }

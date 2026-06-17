@@ -1,7 +1,7 @@
 name: sejong_smart_campus
 description: "Sejong University unified mobile app - lightweight, offline-tolerant."
 publish_to: 'none'
-version: 1.0.9+9
+version: 1.0.12+12
 
 environment:
   sdk: ^3.11.4

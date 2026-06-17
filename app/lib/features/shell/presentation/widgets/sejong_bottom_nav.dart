@@ -25,13 +25,12 @@ class SejongBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
 
-  // U-Check는 메인 nav 탭에서 빠지고, 메인 화면의 바로가기 / 알림 tap /
-  // 전체 서비스에서 push 형태로 진입. (열람실·학식·시설예약과 동일한
-  // sub-screen 패턴 — 뒤로가기 버튼이 있는 독립 화면.)
+  // U-Check와 커뮤니티성 기능은 메인 화면의 바로가기 / 알림 tap /
+  // 전체 서비스에서 push 형태로 진입. 하단 세 번째 탭은 실 API 공지 목록 전용.
   static const _items = <_NavItem>[
     _NavItem('메인', Symbols.home),
     _NavItem('학생증', Symbols.badge),
-    _NavItem('커뮤니티', Symbols.forum),
+    _NavItem('공지', Symbols.campaign),
     _NavItem('전체', Symbols.menu),
   ];
 

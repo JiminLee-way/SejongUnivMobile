@@ -1,13 +1,47 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import 'package:sejong_smart_campus/features/app_update/data/datasources/app_update_recommendation_dismiss_local.dart';
 import 'package:sejong_smart_campus/features/app_update/data/datasources/supabase_app_config_remote.dart';
 import 'package:sejong_smart_campus/features/app_update/domain/entities/app_update_config.dart';
 
 final _appConfigRemoteProvider = Provider<SupabaseAppConfigRemote>(
   (ref) => SupabaseAppConfigRemote(Supabase.instance.client),
 );
+
+final appUpdateRecommendationDismissLocalProvider =
+    Provider<AppUpdateRecommendationDismissLocal>(
+      (ref) => AppUpdateRecommendationDismissLocal(),
+    );
+
+typedef AppUpdateStoreLauncher = Future<bool> Function(String storeUrl);
+
+final appUpdateStoreLauncherProvider = Provider<AppUpdateStoreLauncher>((ref) {
+  return (storeUrl) async {
+    if (storeUrl.trim().isEmpty) return false;
+    final uri = Uri.tryParse(storeUrl);
+    if (uri == null) return false;
+    return launchUrl(uri, mode: LaunchMode.externalApplication);
+  };
+});
+
+class AppUpdateSessionDismissedBuilds extends Notifier<Set<int>> {
+  @override
+  Set<int> build() => <int>{};
+
+  bool contains(int latestBuildNumber) => state.contains(latestBuildNumber);
+
+  void dismiss(int latestBuildNumber) {
+    state = {...state, latestBuildNumber};
+  }
+}
+
+final appUpdateSessionDismissedBuildsProvider =
+    NotifierProvider<AppUpdateSessionDismissedBuilds, Set<int>>(
+      AppUpdateSessionDismissedBuilds.new,
+    );
 
 /// 업데이트 판정 결과 — 판정 + (권장/강제 시) 문구·스토어URL 동봉.
 class AppUpdateStatus {
