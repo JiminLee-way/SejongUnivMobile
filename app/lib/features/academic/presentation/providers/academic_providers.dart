@@ -16,6 +16,97 @@ String _yyyymmdd(DateTime d) {
   return '${d.year}${pad(d.month)}${pad(d.day)}';
 }
 
+class OfficialCalendarModeNotifier extends Notifier<AcademicCalendarMode> {
+  @override
+  AcademicCalendarMode build() => AcademicCalendarMode.month;
+
+  void select(AcademicCalendarMode mode) => state = mode;
+}
+
+final officialCalendarModeProvider =
+    NotifierProvider<OfficialCalendarModeNotifier, AcademicCalendarMode>(
+      OfficialCalendarModeNotifier.new,
+    );
+
+class OfficialCalendarCategoryNotifier
+    extends Notifier<AcademicCalendarCategory> {
+  @override
+  AcademicCalendarCategory build() => AcademicCalendarCategory.university;
+
+  void select(AcademicCalendarCategory category) => state = category;
+}
+
+final officialCalendarCategoryProvider =
+    NotifierProvider<
+      OfficialCalendarCategoryNotifier,
+      AcademicCalendarCategory
+    >(OfficialCalendarCategoryNotifier.new);
+
+class OfficialCalendarMonthNotifier extends Notifier<DateTime> {
+  @override
+  DateTime build() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, 1);
+  }
+
+  void selectYear(int year) => state = DateTime(year, state.month, 1);
+  void selectMonth(int month) => state = DateTime(state.year, month, 1);
+  void select(DateTime month) => state = DateTime(month.year, month.month, 1);
+
+  void shift(int months) {
+    final normalized = DateTime(state.year, state.month + months, 1);
+    state = DateTime(normalized.year, normalized.month, 1);
+  }
+}
+
+final officialCalendarMonthProvider =
+    NotifierProvider<OfficialCalendarMonthNotifier, DateTime>(
+      OfficialCalendarMonthNotifier.new,
+    );
+
+class OfficialCalendarYearNotifier extends Notifier<int> {
+  @override
+  int build() => DateTime.now().year;
+
+  void select(int year) => state = year;
+  void shift(int years) => state += years;
+}
+
+final officialCalendarYearProvider =
+    NotifierProvider<OfficialCalendarYearNotifier, int>(
+      OfficialCalendarYearNotifier.new,
+    );
+
+typedef OfficialCalendarQuery = ({
+  AcademicCalendarMode mode,
+  int year,
+  int month,
+  String categoryCode,
+});
+
+final officialAcademicCalendarProvider = FutureProvider.autoDispose
+    .family<List<AcademicCalendarEvent>, OfficialCalendarQuery>((
+      ref,
+      query,
+    ) async {
+      final remote = await ref.watch(_academicRemoteProvider.future);
+      final category = AcademicCalendarCategory.byCode(query.categoryCode);
+      final AcademicCalendarRange range;
+      if (query.mode == AcademicCalendarMode.month) {
+        range = academicCalendarMonthGridRange(query.year, query.month);
+      } else {
+        range = AcademicCalendarRange(
+          start: DateTime(query.year),
+          end: DateTime(query.year, 12, 31),
+        );
+      }
+      return remote.fetchOfficialCalendarEvents(
+        start: range.start,
+        end: range.end,
+        category: category,
+      );
+    });
+
 /// 학사 캘린더 화면이 현재 보고 있는 날짜.
 class CalendarDateNotifier extends Notifier<DateTime> {
   @override

@@ -355,7 +355,7 @@ SejongMenuItem _buildJiphyunCampusItem() {
     itemLevel: 1,
     displayOrder: 999,
     url: 'client.jiphyunCampus',
-    webUrl: '',
+    webUrl: 'https://ecampus.sejong.ac.kr/',
     target: '_self',
     iconClass: 'School',
     callType: 'NONE',

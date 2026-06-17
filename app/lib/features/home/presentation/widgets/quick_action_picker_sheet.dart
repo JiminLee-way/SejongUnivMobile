@@ -142,6 +142,8 @@ class _ItemList extends ConsumerWidget {
   final bool atMax;
   final ScrollController scrollController;
 
+  static const _hiddenShortcutKeys = <String>{'client.club'};
+
   /// 메뉴 트리 + registry-only(tab switch 등) 키를 모두 flatten.
   List<_PickerEntry> _collect() {
     final entries = <_PickerEntry>[];
@@ -150,6 +152,7 @@ class _ItemList extends ConsumerWidget {
     // 1) registry에 있는 키 우선 (탭 전환 가상 키 포함). 우리가 노출하고 싶은
     // 순서대로.
     for (final entry in kQuickActionRegistry.entries) {
+      if (_hiddenShortcutKeys.contains(entry.key)) continue;
       if (seen.add(entry.key)) {
         entries.add(
           _PickerEntry(
@@ -167,7 +170,7 @@ class _ItemList extends ConsumerWidget {
     //    방지로 skip.
     void walk(SejongMenuItem n) {
       if (n.isLeaf && n.visible && n.active && n.url.isNotEmpty) {
-        if (seen.add(n.url)) {
+        if (!_hiddenShortcutKeys.contains(n.url) && seen.add(n.url)) {
           entries.add(
             _PickerEntry(
               key: n.url,

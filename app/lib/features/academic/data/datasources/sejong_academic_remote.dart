@@ -1,10 +1,80 @@
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
 import 'package:sejong_smart_campus/core/network/sejong_api_client.dart';
 import 'package:sejong_smart_campus/core/network/sejong_endpoints.dart';
+import 'package:sejong_smart_campus/core/network/service_urls.dart';
 import 'package:sejong_smart_campus/features/academic/domain/entities/academic_models.dart';
 
 class SejongAcademicRemote {
-  SejongAcademicRemote({required this.client});
+  SejongAcademicRemote({required this.client, Dio? webDio})
+    : _webDio =
+          webDio ??
+          Dio(
+            BaseOptions(
+              baseUrl: _sejongWebBase,
+              connectTimeout: const Duration(seconds: 10),
+              receiveTimeout: const Duration(seconds: 20),
+              responseType: ResponseType.json,
+              headers: const {
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'ko-KR,ko;q=0.9',
+                'User-Agent':
+                    'Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 '
+                    '(KHTML, like Gecko) Chrome/149.0 Mobile Safari/537.36',
+              },
+            ),
+          );
+
+  static const _fallbackSejongWebBase = 'https://www.sejong.ac.kr';
+  static String get _sejongWebBase {
+    final configured = ServiceUrls.sejongWeb.trim();
+    if (configured.isEmpty) return _fallbackSejongWebBase;
+    return configured.endsWith('/')
+        ? configured.substring(0, configured.length - 1)
+        : configured;
+  }
+
   final SejongApiClient client;
+  final Dio _webDio;
+
+  Future<List<AcademicCalendarEvent>> fetchOfficialCalendarEvents({
+    required DateTime start,
+    required DateTime end,
+    required AcademicCalendarCategory category,
+  }) async {
+    final res = await _webDio.get<dynamic>(
+      '/kor/academics/academic-calendar.do',
+      queryParameters: {
+        'mode': 'getCalendarData',
+        'start': _yyyyMmDd(start),
+        'end': _yyyyMmDd(end),
+        'collDiv': category.code,
+      },
+    );
+    return parseOfficialCalendarResponse(res.data);
+  }
+
+  static List<AcademicCalendarEvent> parseOfficialCalendarResponse(
+    Object? raw,
+  ) {
+    final decoded = raw is String ? jsonDecode(raw) : raw;
+    if (decoded is! Map) return const <AcademicCalendarEvent>[];
+    final data = decoded['data'];
+    if (data is! List) return const <AcademicCalendarEvent>[];
+    return sortAcademicCalendarEvents(
+      data
+          .whereType<Map>()
+          .map((row) => row.cast<String, dynamic>())
+          .map(AcademicCalendarEvent.fromOfficialJson)
+          .where((event) => event.title.isNotEmpty),
+    );
+  }
+
+  static String _yyyyMmDd(DateTime date) {
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${date.year}-${two(date.month)}-${two(date.day)}';
+  }
 
   Future<List<CalendarItem>> fetchDailyCalendar(String yyyyMmDd) async {
     final res = await client.dio.get<dynamic>(

@@ -95,6 +95,7 @@ const kQuickActionRegistry = <String, QuickActionInfo>{
     label: 'U-Check',
     icon: Symbols.qr_code_scanner,
   ),
+  'client.sjpt': QuickActionInfo(label: '학교시설대여', icon: Symbols.door_open),
   'client.club': QuickActionInfo(label: '동아리', icon: Symbols.groups),
   'client.lab': QuickActionInfo(label: '연구실', icon: Symbols.science),
   'client.petition': QuickActionInfo(label: '청원', icon: Symbols.campaign),
@@ -102,6 +103,11 @@ const kQuickActionRegistry = <String, QuickActionInfo>{
     label: '커뮤니티',
     icon: Symbols.forum,
     tabIndex: 2,
+  ),
+  'client.studentIdTab': QuickActionInfo(
+    label: '학생증',
+    icon: Symbols.badge,
+    tabIndex: 1,
   ),
   'client.jiphyunCampus': QuickActionInfo(label: '집현캠퍼스', icon: Symbols.school),
   // 추가로 picker에서 노출할 항목들
@@ -111,9 +117,11 @@ const kQuickActionRegistry = <String, QuickActionInfo>{
   ),
   'cmm.faq': QuickActionInfo(label: '도움말', icon: Symbols.help),
   'inf.scheduleManagement': QuickActionInfo(
-    label: '학사 캘린더',
+    label: '학사캘린더',
     icon: Symbols.event_note,
   ),
+  'inf.notice.general': QuickActionInfo(label: '일반공지', icon: Symbols.article),
+  'inf.notice.academic': QuickActionInfo(label: '학사공지', icon: Symbols.school),
   'aca.gradeInquiry': QuickActionInfo(label: '성적', icon: Symbols.grade),
   'aca.scholarshipStatus': QuickActionInfo(label: '장학금', icon: Symbols.school),
   'aca.tuitionDetails': QuickActionInfo(label: '등록금', icon: Symbols.payments),
@@ -123,19 +131,73 @@ const kQuickActionRegistry = <String, QuickActionInfo>{
   ),
 };
 
-/// 첫 실행 시 기본 바로가기 키 (현재 home_screen에 하드코딩 됐던 10개와 동일).
+/// 첫 실행 시 기본 바로가기 키.
 const kDefaultQuickActionKeys = <String>[
+  'inf.scheduleManagement',
+  'aca.classSchedule',
+  'client.libraryFloors',
+  'client.libseat',
+  'inf.universityLife.schoolCafeteria',
+  'client.sjpt',
+  'client.jiphyunCampus',
+  'client.studentIdTab',
+  'inf.notice.general',
+  'inf.notice.academic',
+];
+
+/// 1.0.8까지의 기본 바로가기. 저장값이 이 순서 그대로면 사용자가 커스텀하지
+/// 않은 상태로 보고 새 기본값으로 1회 승격한다.
+const kLegacyDefaultQuickActionKeys = <String>[
   'aca.classSchedule',
   'client.libraryFloors',
   'inf.universityLife.schoolCafeteria',
   'client.libseat',
   'client.uCheckTab',
-  'client.club',
+  'client.sjpt',
   'client.lab',
   'client.petition',
   'client.communityTab',
   'client.jiphyunCampus',
 ];
+
+const _legacyQuickActionKeyReplacements = <String, String>{
+  'client.club': 'client.sjpt',
+};
+
+/// 저장된 예전 바로가기 키를 현재 기본 구성으로 보정한다.
+///
+/// 기존 설치에서 `client.club`이 로컬 저장소에 남아 있어도 홈 버튼은 새
+/// "학교시설대여" 동작으로 바뀌어야 하므로, 읽기 시점에 1회 치환한다.
+List<String> normalizeQuickActionKeys(Iterable<String> keys) {
+  final out = <String>[];
+  for (final key in keys) {
+    final normalized = _legacyQuickActionKeyReplacements[key] ?? key;
+    if (out.contains(normalized)) continue;
+    out.add(normalized);
+    if (out.length >= kQuickActionsMaxCount) break;
+  }
+  return out;
+}
+
+/// 저장소에서 읽은 바로가기만 대상으로 하는 버전 마이그레이션.
+///
+/// 사용자가 직접 바꾼 순서는 건드리지 않고, 기존 기본값과 같은 경우만 새
+/// 기본값으로 교체한다.
+List<String> migrateSavedQuickActionKeys(Iterable<String> keys) {
+  final normalized = normalizeQuickActionKeys(keys);
+  if (_sameKeys(normalized, kLegacyDefaultQuickActionKeys)) {
+    return List<String>.from(kDefaultQuickActionKeys);
+  }
+  return normalized;
+}
+
+bool _sameKeys(List<String> a, List<String> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
 
 /// 그리드 최대 행 / 최대 항목 수.
 const int kQuickActionsMaxCols = 5;

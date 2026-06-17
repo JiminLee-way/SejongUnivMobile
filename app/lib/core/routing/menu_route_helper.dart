@@ -7,6 +7,7 @@ import 'package:sejong_smart_campus/core/network/service_urls.dart';
 import 'package:sejong_smart_campus/core/routing/app_page_route.dart';
 import 'package:sejong_smart_campus/shared/widgets/app_toast.dart';
 import 'package:sejong_smart_campus/features/academic/presentation/screens/grades_screen.dart';
+import 'package:sejong_smart_campus/features/academic/presentation/screens/academic_calendar_screen.dart';
 import 'package:sejong_smart_campus/features/cafeteria/presentation/screens/cafeteria_screen.dart';
 import 'package:sejong_smart_campus/features/finance/presentation/screens/finance_screen.dart';
 import 'package:sejong_smart_campus/features/library/presentation/screens/library_list_screen.dart';
@@ -70,13 +71,17 @@ bool routeByKey(
         push(NoticesScreen(initial: cat));
       }
       return true;
+    case 'inf.notice.general':
+      push(const NoticesScreen(initial: NoticeCategory.general));
+      return true;
+    case 'inf.notice.academic':
+      push(const NoticesScreen(initial: NoticeCategory.academic));
+      return true;
     case 'cmm.notificationBox':
       push(const NotificationsScreen());
       return true;
     case 'inf.scheduleManagement':
-      // 학사일정 — 자체 네이티브 캘린더 대신 세종대 공식 웹 학사일정 페이지를
-      // 인앱 브라우저로 노출(가독성이 더 좋음).
-      unawaited(openAcademicCalendar(context));
+      push(const AcademicCalendarScreen());
       return true;
     case 'aca.gradeInquiry':
     case 'aca.currentSemesterGrade':
@@ -119,6 +124,9 @@ bool routeByKey(
       // 않았다. 그래서 standalone push 대신 **탭 전환**한다(드로어면 닫고).
       _switchTab(context, 2);
       return true;
+    case 'client.studentIdTab':
+      _switchTab(context, 1);
+      return true;
     case 'client.libseat':
       // 바로가기 가상 키 — LibseatScreen 직접 push
       push(const LibseatScreen());
@@ -126,6 +134,9 @@ bool routeByKey(
     case 'client.uCheckTab':
       // UCheck는 nav 탭에서 빠지고 sub-screen으로 push (열람실·학식 패턴).
       push(const UCheckScreen());
+      return true;
+    case 'client.jiphyunCampus':
+      unawaited(openJiphyunCampus(context));
       return true;
     // 동아리/연구실/청원 — 미구현. dispatcher fallback(느린 웹뷰/그룹헤더)으로 새지
     // 않도록 여기서 즉시 "준비 중" 안내. (전체서비스·홈 바로가기 공통 경로)
@@ -149,8 +160,17 @@ bool routeByMenuItem(BuildContext context, SejongMenuItem item) {
 }
 
 /// 학사일정 웹페이지 — 자체 네이티브 캘린더보다 가독성이 좋아 웹으로 노출.
-const String kAcademicCalendarUrl =
-    '${ServiceUrls.sejongWeb}/kor/academics/academic-calendar.do?mode=calendar';
+String get kAcademicCalendarUrl {
+  final configured = ServiceUrls.sejongWeb.trim();
+  final base = configured.isEmpty
+      ? 'https://www.sejong.ac.kr'
+      : configured.endsWith('/')
+      ? configured.substring(0, configured.length - 1)
+      : configured;
+  return '$base/kor/academics/academic-calendar.do?mode=calendar';
+}
+
+const String kJiphyunCampusUrl = 'https://ecampus.sejong.ac.kr/';
 
 /// 학사일정 — 세종대 공식 웹 학사일정을 인앱 브라우저로 연다.
 Future<void> openAcademicCalendar(BuildContext context) async {
@@ -162,6 +182,19 @@ Future<void> openAcademicCalendar(BuildContext context) async {
     if (!ok && context.mounted) showRouteUnavailable(context, '학사일정');
   } catch (_) {
     if (context.mounted) showRouteUnavailable(context, '학사일정');
+  }
+}
+
+/// 집현캠퍼스 — 사용자가 요청한 대로 시스템 인터넷 브라우저로 연다.
+Future<void> openJiphyunCampus(BuildContext context) async {
+  try {
+    final ok = await launchUrl(
+      Uri.parse(kJiphyunCampusUrl),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!ok && context.mounted) showRouteUnavailable(context, '집현캠퍼스');
+  } catch (_) {
+    if (context.mounted) showRouteUnavailable(context, '집현캠퍼스');
   }
 }
 

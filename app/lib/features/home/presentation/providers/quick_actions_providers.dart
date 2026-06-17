@@ -15,12 +15,16 @@ class QuickActionsNotifier extends AsyncNotifier<List<String>> {
   @override
   Future<List<String>> build() async {
     final saved = await _storage.load();
-    return saved ?? List<String>.from(kDefaultQuickActionKeys);
+    if (saved == null) return List<String>.from(kDefaultQuickActionKeys);
+    final normalized = migrateSavedQuickActionKeys(saved);
+    if (!_sameKeys(saved, normalized)) await _storage.save(normalized);
+    return normalized;
   }
 
   Future<void> setOrder(List<String> keys) async {
-    state = AsyncData(List<String>.from(keys));
-    await _storage.save(keys);
+    final normalized = normalizeQuickActionKeys(keys);
+    state = AsyncData(normalized);
+    await _storage.save(normalized);
   }
 
   Future<void> add(String key) async {
@@ -45,6 +49,14 @@ class QuickActionsNotifier extends AsyncNotifier<List<String>> {
     state = AsyncData(defaults);
     await _storage.clear();
   }
+}
+
+bool _sameKeys(List<String> a, List<String> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }
 
 final quickActionsProvider =

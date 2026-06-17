@@ -1,6 +1,154 @@
 /// 학사 캘린더 · 학생 일정 · 성적 도메인.
 library;
 
+enum AcademicCalendarMode { month, year }
+
+class AcademicCalendarCategory {
+  const AcademicCalendarCategory({required this.code, required this.label});
+
+  final String code;
+  final String label;
+
+  static const university = AcademicCalendarCategory(code: '0001', label: '대학');
+
+  static const values = <AcademicCalendarCategory>[
+    university,
+    AcademicCalendarCategory(code: '0002', label: '일반대학원'),
+    AcademicCalendarCategory(code: '0003', label: '경영전문대학원'),
+    AcademicCalendarCategory(code: '0004', label: '교육대학원'),
+    AcademicCalendarCategory(code: '0005', label: '관광대학원'),
+    AcademicCalendarCategory(code: '0006', label: '융합예술대학원'),
+    AcademicCalendarCategory(code: '0007', label: '공공정책대학원'),
+  ];
+
+  static AcademicCalendarCategory byCode(String code) {
+    return values.firstWhere(
+      (category) => category.code == code,
+      orElse: () => university,
+    );
+  }
+}
+
+class AcademicCalendarEvent {
+  const AcademicCalendarEvent({
+    required this.title,
+    required this.titleEng,
+    required this.startDate,
+    required this.endDate,
+    required this.categoryCode,
+    required this.categoryName,
+    required this.sourceYear,
+    required this.sourceMonth,
+  });
+
+  final String title;
+  final String titleEng;
+  final DateTime startDate;
+  final DateTime endDate;
+  final String categoryCode;
+  final String categoryName;
+  final int sourceYear;
+  final int sourceMonth;
+
+  factory AcademicCalendarEvent.fromOfficialJson(Map<String, dynamic> json) {
+    DateTime parseDate(Object? value) {
+      final raw = (value ?? '').toString().trim();
+      if (raw.isEmpty) return DateTime(1970);
+      final parsed = DateTime.parse(raw);
+      return DateTime(parsed.year, parsed.month, parsed.day);
+    }
+
+    final start = parseDate(json['frDt']);
+    final end = parseDate(json['toDt']);
+    return AcademicCalendarEvent(
+      title: (json['scmSubject'] ?? '').toString().trim(),
+      titleEng: (json['scmSubjectEng'] ?? '').toString().trim(),
+      startDate: start,
+      endDate: end.isBefore(start) ? start : end,
+      categoryCode: (json['collDiv'] ?? '').toString().trim(),
+      categoryName: (json['collDivNm'] ?? '').toString().trim(),
+      sourceYear: ((json['scmYear'] as num?) ?? start.year).toInt(),
+      sourceMonth: ((json['scmMonth'] as num?) ?? start.month).toInt(),
+    );
+  }
+
+  bool occursOn(DateTime date) {
+    final d = DateTime(date.year, date.month, date.day);
+    return !d.isBefore(startDate) && !d.isAfter(endDate);
+  }
+
+  bool overlaps(DateTime start, DateTime end) {
+    final s = DateTime(start.year, start.month, start.day);
+    final e = DateTime(end.year, end.month, end.day);
+    return !endDate.isBefore(s) && !startDate.isAfter(e);
+  }
+
+  String get dateLabel {
+    final start = _formatDate(startDate);
+    final end = _formatDate(endDate);
+    if (start == end) return start;
+    return '$start ~ $end';
+  }
+
+  static String _formatDate(DateTime date) {
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${date.year}.${two(date.month)}.${two(date.day)}';
+  }
+}
+
+class AcademicCalendarRange {
+  const AcademicCalendarRange({required this.start, required this.end});
+
+  final DateTime start;
+  final DateTime end;
+}
+
+AcademicCalendarRange academicCalendarMonthGridRange(int year, int month) {
+  final first = DateTime(year, month, 1);
+  final start = first.subtract(Duration(days: first.weekday % 7));
+  return AcademicCalendarRange(
+    start: start,
+    end: start.add(const Duration(days: 41)),
+  );
+}
+
+List<DateTime> academicCalendarMonthGridDays(int year, int month) {
+  final range = academicCalendarMonthGridRange(year, month);
+  return List<DateTime>.generate(
+    42,
+    (index) => range.start.add(Duration(days: index)),
+  );
+}
+
+List<AcademicCalendarEvent> sortAcademicCalendarEvents(
+  Iterable<AcademicCalendarEvent> events,
+) {
+  final sorted = events.toList();
+  sorted.sort((a, b) {
+    final byStart = a.startDate.compareTo(b.startDate);
+    if (byStart != 0) return byStart;
+    final byEnd = a.endDate.compareTo(b.endDate);
+    if (byEnd != 0) return byEnd;
+    return a.title.compareTo(b.title);
+  });
+  return sorted;
+}
+
+Map<int, List<AcademicCalendarEvent>> groupAcademicEventsByStartMonth(
+  Iterable<AcademicCalendarEvent> events,
+) {
+  final grouped = <int, List<AcademicCalendarEvent>>{
+    for (var month = 1; month <= 12; month++) month: <AcademicCalendarEvent>[],
+  };
+  for (final event in sortAcademicCalendarEvents(events)) {
+    final month = event.startDate.month;
+    if (grouped.containsKey(month)) {
+      grouped[month]!.add(event);
+    }
+  }
+  return grouped;
+}
+
 /// `/api/publicapi/academic-calendar/daily?date=YYYYMMDD` 한 항목.
 /// `/api/secureapi/academic-calendar/student/daily-all?date=...`도 동일 모양.
 class CalendarItem {
