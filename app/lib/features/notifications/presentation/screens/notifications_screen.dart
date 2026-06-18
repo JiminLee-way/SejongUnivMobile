@@ -12,15 +12,26 @@ import 'package:sejong_smart_campus/features/notifications/presentation/provider
 import 'package:sejong_smart_campus/shared/widgets/glass_card.dart';
 import 'package:sejong_smart_campus/shared/widgets/mesh_background.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_refresh.dart';
+import 'package:sejong_smart_campus/shared/widgets/shimmer.dart';
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
 
   Future<void> _onRefresh(WidgetRef ref) async {
     ref.invalidate(inboxProvider);
+    ref.invalidate(combinedInboxProvider);
     ref.invalidate(pendingFriendRequestsProvider);
     ref.invalidate(unreadCountProvider);
-    await Future<void>.delayed(const Duration(milliseconds: 400));
+    try {
+      await Future.wait([
+        Future<void>.delayed(const Duration(milliseconds: 300)),
+        ref.read(combinedInboxProvider.future).then((_) {}),
+        ref.read(pendingFriendRequestsProvider.future).then((_) {}),
+        ref.read(unreadCountProvider.future).then((_) {}),
+      ]);
+    } catch (_) {
+      // 네트워크 실패는 화면의 error/partial data UI가 처리한다.
+    }
   }
 
   @override
@@ -39,15 +50,9 @@ class NotificationsScreen extends ConsumerWidget {
                 onRefresh: () => _onRefresh(ref),
                 topInset: mq.padding.top + 64,
                 child: inboxAsync.when(
-                  loading: () => const Center(
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.4,
-                        color: AppColors.primary,
-                      ),
-                    ),
+                  loading: () => _NotificationListSkeleton(
+                    topPadding: mq.padding.top + 64 + 16,
+                    bottomPadding: 120 + mq.padding.bottom,
                   ),
                   error: (_, _) => _ErrorView(onRetry: () => _onRefresh(ref)),
                   data: (items) {
@@ -98,6 +103,66 @@ class NotificationsScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _NotificationListSkeleton extends StatelessWidget {
+  const _NotificationListSkeleton({
+    required this.topPadding,
+    required this.bottomPadding,
+  });
+
+  final double topPadding;
+  final double bottomPadding;
+
+  @override
+  Widget build(BuildContext context) => ListView.separated(
+    padding: EdgeInsets.only(
+      top: topPadding,
+      left: AppSpacing.marginMobile,
+      right: AppSpacing.marginMobile,
+      bottom: bottomPadding,
+    ),
+    physics: const AlwaysScrollableScrollPhysics(
+      parent: BouncingScrollPhysics(),
+    ),
+    itemCount: 6,
+    separatorBuilder: (context, index) => const SizedBox(height: 8),
+    itemBuilder: (context, index) => const Shimmer(
+      child: GlassCard(
+        borderRadius: AppRadius.lg,
+        padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ShimmerBox(width: 8, height: 8, radius: AppRadius.full),
+            SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      ShimmerBox(width: 48, height: 18, radius: AppRadius.full),
+                      SizedBox(width: 8),
+                      ShimmerBox(width: 68, height: 12, radius: AppRadius.sm),
+                    ],
+                  ),
+                  SizedBox(height: 10),
+                  ShimmerBox(
+                    width: double.infinity,
+                    height: 14,
+                    radius: AppRadius.sm,
+                  ),
+                  SizedBox(height: 8),
+                  ShimmerBox(width: 220, height: 12, radius: AppRadius.sm),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 class _AppBar extends StatelessWidget {

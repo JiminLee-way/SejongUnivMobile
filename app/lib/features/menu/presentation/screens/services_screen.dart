@@ -20,6 +20,7 @@ import 'package:sejong_smart_campus/shared/widgets/glass_app_bar_shell.dart';
 import 'package:sejong_smart_campus/shared/widgets/glass_card.dart';
 import 'package:sejong_smart_campus/shared/widgets/mesh_background.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_refresh.dart';
+import 'package:sejong_smart_campus/shared/widgets/shimmer.dart';
 
 /// "전체 서비스" 화면 — sjapp STUDENT_MAIN 메뉴 트리 미러.
 ///
@@ -52,7 +53,15 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
 
   Future<void> _onRefresh() async {
     ref.invalidate(studentMenuTreeProvider);
-    await Future<void>.delayed(const Duration(milliseconds: 400));
+    try {
+      await Future.wait([
+        Future<void>.delayed(const Duration(milliseconds: 300)),
+        ref.read(studentMenuTreeProvider.future).then((_) {}),
+        ref.read(menuOrderProvider.future).then((_) {}),
+      ]);
+    } catch (_) {
+      // 메뉴 error UI가 실패 상태를 렌더한다.
+    }
   }
 
   Future<void> _open(SejongMenuItem item) async {
@@ -112,21 +121,8 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                 ),
                 const SliverToBoxAdapter(child: SizedBox(height: 16)),
                 treeAsync.when(
-                  loading: () => const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(vertical: 64),
-                      child: Center(
-                        child: SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.4,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  loading: () =>
+                      const SliverToBoxAdapter(child: _ServicesTreeSkeleton()),
                   error: (e, _) => SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.all(AppSpacing.marginMobile),
@@ -233,6 +229,49 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
 }
 
 // ─── AppBar ────────────────────────────────────────────────────────────────
+
+class _ServicesTreeSkeleton extends StatelessWidget {
+  const _ServicesTreeSkeleton();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+    padding: EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile),
+    child: Shimmer(
+      child: Column(
+        children: [
+          _ServiceSkeletonCard(),
+          SizedBox(height: 10),
+          _ServiceSkeletonCard(),
+          SizedBox(height: 10),
+          _ServiceSkeletonCard(),
+          SizedBox(height: 10),
+          _ServiceSkeletonCard(),
+          SizedBox(height: 10),
+          _ServiceSkeletonCard(),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ServiceSkeletonCard extends StatelessWidget {
+  const _ServiceSkeletonCard();
+
+  @override
+  Widget build(BuildContext context) => const GlassCard(
+    borderRadius: AppRadius.lg,
+    padding: EdgeInsets.fromLTRB(14, 14, 14, 14),
+    child: Row(
+      children: [
+        ShimmerBox(width: 34, height: 34, radius: AppRadius.md),
+        SizedBox(width: 12),
+        Expanded(child: ShimmerBox(height: 16, radius: AppRadius.sm)),
+        SizedBox(width: 12),
+        ShimmerBox(width: 22, height: 22, radius: AppRadius.full),
+      ],
+    ),
+  );
+}
 
 class _ServicesAppBar extends ConsumerWidget {
   const _ServicesAppBar({this.asDrawer = false, this.onClose});

@@ -9,6 +9,7 @@ import 'package:sejong_smart_campus/features/finance/presentation/providers/fina
 import 'package:sejong_smart_campus/shared/widgets/glass_card.dart';
 import 'package:sejong_smart_campus/shared/widgets/mesh_background.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_refresh.dart';
+import 'package:sejong_smart_campus/shared/widgets/shimmer.dart';
 
 enum FinanceTab { scholarship, tuition, discretionary }
 
@@ -24,13 +25,30 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
   FinanceSemester? _selected;
 
   Future<void> _onRefresh() async {
-    if (_selected == null) return;
-    final key = (year: _selected!.year, smtCd: _selected!.smtCd);
-    ref
-      ..invalidate(scholarshipsProvider(key))
-      ..invalidate(tuitionNoticeProvider(key))
-      ..invalidate(discretionaryProvider(key));
-    await Future<void>.delayed(const Duration(milliseconds: 400));
+    try {
+      var selected = _selected;
+      if (selected == null) {
+        ref.invalidate(scholarshipSemestersProvider);
+        final semesters = await ref.read(scholarshipSemestersProvider.future);
+        if (semesters.isEmpty) return;
+        selected = semesters.first;
+        if (mounted) setState(() => _selected ??= selected);
+      }
+
+      final key = (year: selected.year, smtCd: selected.smtCd);
+      ref
+        ..invalidate(scholarshipsProvider(key))
+        ..invalidate(tuitionNoticeProvider(key))
+        ..invalidate(discretionaryProvider(key));
+      await Future.wait([
+        Future<void>.delayed(const Duration(milliseconds: 300)),
+        ref.read(scholarshipsProvider(key).future).then((_) {}),
+        ref.read(tuitionNoticeProvider(key).future).then((_) {}),
+        ref.read(discretionaryProvider(key).future).then((_) {}),
+      ]);
+    } catch (_) {
+      // 실패는 현재 탭 provider의 error UI가 처리한다.
+    }
   }
 
   @override
@@ -65,7 +83,7 @@ class _FinanceScreenState extends ConsumerState<FinanceScreen> {
                     ),
                     const SizedBox(height: 12),
                     semestersAsync.when(
-                      loading: () => const _CenterSpinner(),
+                      loading: () => const _FinancePageSkeleton(),
                       error: (_, _) => const _ErrorBox(),
                       data: (sems) {
                         if (sems.isEmpty) {
@@ -291,7 +309,7 @@ class _ScholarshipBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return asyncValue.when(
-      loading: () => const _CenterSpinner(),
+      loading: () => const _FinanceCardSkeleton(),
       error: (_, _) => const _ErrorBox(),
       data: (items) {
         if (items.isEmpty) {
@@ -349,7 +367,7 @@ class _TuitionBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return asyncValue.when(
-      loading: () => const _CenterSpinner(),
+      loading: () => const _FinanceListSkeleton(),
       error: (_, _) => const _ErrorBox(),
       data: (items) {
         if (items.isEmpty) {
@@ -440,7 +458,7 @@ class _DiscretionaryBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return asyncValue.when(
-      loading: () => const _CenterSpinner(),
+      loading: () => const _FinanceListSkeleton(),
       error: (_, _) => const _ErrorBox(),
       data: (groups) {
         if (groups.isEmpty) {
@@ -601,20 +619,73 @@ String _fmt(int amount) {
   return buf.toString();
 }
 
-class _CenterSpinner extends StatelessWidget {
-  const _CenterSpinner();
+class _FinancePageSkeleton extends StatelessWidget {
+  const _FinancePageSkeleton();
+
   @override
-  Widget build(BuildContext context) => const Padding(
-    padding: EdgeInsets.symmetric(vertical: 48),
-    child: Center(
-      child: SizedBox(
-        width: 22,
-        height: 22,
-        child: CircularProgressIndicator(
-          strokeWidth: 2.4,
-          color: AppColors.primary,
+  Widget build(BuildContext context) => const Shimmer(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            ShimmerBox(width: 86, height: 34, radius: AppRadius.full),
+            SizedBox(width: 8),
+            ShimmerBox(width: 92, height: 34, radius: AppRadius.full),
+            SizedBox(width: 8),
+            ShimmerBox(width: 78, height: 34, radius: AppRadius.full),
+          ],
         ),
+        SizedBox(height: 12),
+        _FinanceCardSkeleton(),
+      ],
+    ),
+  );
+}
+
+class _FinanceCardSkeleton extends StatelessWidget {
+  const _FinanceCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) => const Shimmer(
+    child: GlassCard(
+      borderRadius: AppRadius.xl,
+      padding: EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              ShimmerBox(width: 22, height: 22, radius: AppRadius.full),
+              SizedBox(width: 8),
+              ShimmerBox(width: 150, height: 16, radius: AppRadius.sm),
+              Spacer(),
+              ShimmerBox(width: 74, height: 16, radius: AppRadius.sm),
+            ],
+          ),
+          SizedBox(height: 16),
+          ShimmerBox(height: 12, radius: AppRadius.sm),
+          SizedBox(height: 10),
+          ShimmerBox(height: 12, radius: AppRadius.sm),
+          SizedBox(height: 10),
+          ShimmerBox(width: 220, height: 12, radius: AppRadius.sm),
+        ],
       ),
+    ),
+  );
+}
+
+class _FinanceListSkeleton extends StatelessWidget {
+  const _FinanceListSkeleton();
+
+  @override
+  Widget build(BuildContext context) => const Shimmer(
+    child: Column(
+      children: [
+        _FinanceCardSkeleton(),
+        SizedBox(height: 12),
+        _FinanceCardSkeleton(),
+      ],
     ),
   );
 }

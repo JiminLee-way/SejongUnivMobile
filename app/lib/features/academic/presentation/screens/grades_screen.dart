@@ -9,15 +9,35 @@ import 'package:sejong_smart_campus/features/academic/presentation/providers/aca
 import 'package:sejong_smart_campus/shared/widgets/glass_card.dart';
 import 'package:sejong_smart_campus/shared/widgets/mesh_background.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_refresh.dart';
+import 'package:sejong_smart_campus/shared/widgets/shimmer.dart';
 
 class GradesScreen extends ConsumerWidget {
   const GradesScreen({super.key});
 
   Future<void> _onRefresh(WidgetRef ref) async {
-    ref.invalidate(gradesProvider);
-    final sel = ref.read(selectedGradeSemesterProvider);
-    if (sel != null) ref.invalidate(gradeSemesterProvider(sel));
-    await Future<void>.delayed(const Duration(milliseconds: 400));
+    try {
+      ref.invalidate(gradesProvider);
+      final grades = await ref.read(gradesProvider.future);
+      final selected = ref.read(selectedGradeSemesterProvider);
+      final defaultKey = grades.selectedSemester == null
+          ? null
+          : (
+              year: grades.selectedSemester!.year,
+              smtCd: grades.selectedSemester!.smtCd,
+            );
+      final activeKey = selected ?? defaultKey;
+      if (activeKey == null) {
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        return;
+      }
+      ref.invalidate(gradeSemesterProvider(activeKey));
+      await Future.wait([
+        Future<void>.delayed(const Duration(milliseconds: 300)),
+        ref.read(gradeSemesterProvider(activeKey).future).then((_) {}),
+      ]);
+    } catch (_) {
+      // 실패는 성적 목록/detail provider error UI가 렌더한다.
+    }
   }
 
   @override
@@ -36,15 +56,9 @@ class GradesScreen extends ConsumerWidget {
                 onRefresh: () => _onRefresh(ref),
                 topInset: mq.padding.top + 64,
                 child: async.when(
-                  loading: () => const Center(
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.4,
-                        color: AppColors.primary,
-                      ),
-                    ),
+                  loading: () => _GradesPageSkeleton(
+                    topPadding: mq.padding.top + 64 + 16,
+                    bottomPadding: 120 + mq.padding.bottom,
                   ),
                   error: (_, _) => Center(
                     child: Text(
@@ -538,8 +552,7 @@ class _SemesterDetail extends ConsumerWidget {
     }
     final async = ref.watch(gradeSemesterProvider(activeKey));
     return async.when(
-      loading: () =>
-          _DetailSkeleton(year: activeKey.year, smtCd: activeKey.smtCd),
+      loading: () => const _DetailSkeleton(),
       error: (_, _) => GlassCard(
         borderRadius: AppRadius.xl,
         padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
@@ -568,35 +581,114 @@ class _SemesterDetail extends ConsumerWidget {
 }
 
 class _DetailSkeleton extends StatelessWidget {
-  const _DetailSkeleton({required this.year, required this.smtCd});
-  final String year;
-  final String smtCd;
+  const _DetailSkeleton();
   @override
-  Widget build(BuildContext context) {
-    return GlassCard(
+  Widget build(BuildContext context) => const _GradeDetailSkeletonCard();
+}
+
+class _GradesPageSkeleton extends StatelessWidget {
+  const _GradesPageSkeleton({
+    required this.topPadding,
+    required this.bottomPadding,
+  });
+
+  final double topPadding;
+  final double bottomPadding;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    padding: EdgeInsets.only(
+      top: topPadding,
+      left: AppSpacing.marginMobile,
+      right: AppSpacing.marginMobile,
+      bottom: bottomPadding,
+    ),
+    physics: const AlwaysScrollableScrollPhysics(
+      parent: BouncingScrollPhysics(),
+    ),
+    children: const [
+      Shimmer(
+        child: GlassCard(
+          borderRadius: AppRadius.xl,
+          padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  ShimmerBox(width: 22, height: 22, radius: AppRadius.full),
+                  SizedBox(width: 8),
+                  ShimmerBox(width: 130, height: 16, radius: AppRadius.sm),
+                ],
+              ),
+              SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(child: ShimmerBox(height: 54, radius: AppRadius.md)),
+                  SizedBox(width: 8),
+                  Expanded(child: ShimmerBox(height: 54, radius: AppRadius.md)),
+                ],
+              ),
+              SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: ShimmerBox(height: 44, radius: AppRadius.md)),
+                  SizedBox(width: 8),
+                  Expanded(child: ShimmerBox(height: 44, radius: AppRadius.md)),
+                  SizedBox(width: 8),
+                  Expanded(child: ShimmerBox(height: 44, radius: AppRadius.md)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+      SizedBox(height: 16),
+      Shimmer(
+        child: Row(
+          children: [
+            ShimmerBox(width: 84, height: 34, radius: AppRadius.full),
+            SizedBox(width: 8),
+            ShimmerBox(width: 84, height: 34, radius: AppRadius.full),
+            SizedBox(width: 8),
+            ShimmerBox(width: 84, height: 34, radius: AppRadius.full),
+          ],
+        ),
+      ),
+      SizedBox(height: 16),
+      _GradeDetailSkeletonCard(),
+    ],
+  );
+}
+
+class _GradeDetailSkeletonCard extends StatelessWidget {
+  const _GradeDetailSkeletonCard();
+
+  @override
+  Widget build(BuildContext context) => const Shimmer(
+    child: GlassCard(
       borderRadius: AppRadius.xl,
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-      child: Row(
+      padding: EdgeInsets.fromLTRB(20, 18, 20, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.2,
-              color: AppColors.primary,
-            ),
+          Row(
+            children: [
+              ShimmerBox(width: 120, height: 18, radius: AppRadius.sm),
+              Spacer(),
+              ShimmerBox(width: 56, height: 28, radius: AppRadius.full),
+            ],
           ),
-          const SizedBox(width: 10),
-          Text(
-            '$year년 학기 불러오는 중…',
-            style: AppTypography.labelMd.copyWith(
-              color: AppColors.onSurfaceVariant,
-            ),
-          ),
+          SizedBox(height: 14),
+          ShimmerBox(height: 44, radius: AppRadius.md),
+          SizedBox(height: 8),
+          ShimmerBox(height: 44, radius: AppRadius.md),
+          SizedBox(height: 8),
+          ShimmerBox(height: 44, radius: AppRadius.md),
         ],
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _EmptyDetail extends StatelessWidget {

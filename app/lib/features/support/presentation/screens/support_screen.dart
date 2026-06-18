@@ -9,6 +9,7 @@ import 'package:sejong_smart_campus/features/support/presentation/screens/qna_co
 import 'package:sejong_smart_campus/shared/widgets/glass_card.dart';
 import 'package:sejong_smart_campus/shared/widgets/mesh_background.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_refresh.dart';
+import 'package:sejong_smart_campus/shared/widgets/shimmer.dart';
 
 enum SupportTab { faq, qna }
 
@@ -24,13 +25,26 @@ class _SupportScreenState extends ConsumerState<SupportScreen> {
   String? _faqCategory;
 
   Future<void> _onRefresh() async {
-    if (_tab == SupportTab.faq) {
-      ref.invalidate(faqsProvider(_faqCategory));
-      ref.invalidate(faqCategoriesProvider);
-    } else {
-      ref.invalidate(myQnaProvider);
+    try {
+      if (_tab == SupportTab.faq) {
+        final category = _faqCategory;
+        ref.invalidate(faqsProvider(category));
+        ref.invalidate(faqCategoriesProvider);
+        await Future.wait([
+          Future<void>.delayed(const Duration(milliseconds: 300)),
+          ref.read(faqCategoriesProvider.future).then((_) {}),
+          ref.read(faqsProvider(category).future).then((_) {}),
+        ]);
+      } else {
+        ref.invalidate(myQnaProvider);
+        await Future.wait([
+          Future<void>.delayed(const Duration(milliseconds: 300)),
+          ref.read(myQnaProvider.future).then((_) {}),
+        ]);
+      }
+    } catch (_) {
+      // 실패는 현재 탭 provider error UI가 처리한다.
     }
-    await Future<void>.delayed(const Duration(milliseconds: 400));
   }
 
   @override
@@ -267,7 +281,7 @@ class _FaqList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(faqsProvider(categoryId));
     return async.when(
-      loading: () => const _CenterSpinner(),
+      loading: () => const _SupportListSkeleton(),
       error: (_, _) => const _EmptyBox(text: '자주 묻는 질문을 불러오지 못했어요'),
       data: (items) {
         if (items.isEmpty) {
@@ -350,7 +364,7 @@ class _QnaList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(myQnaProvider);
     return async.when(
-      loading: () => const _CenterSpinner(),
+      loading: () => const _SupportListSkeleton(),
       error: (_, _) => const _EmptyBox(text: '문의 내역을 불러오지 못했어요'),
       data: (items) {
         if (items.isEmpty) {
@@ -454,20 +468,41 @@ class _QnaList extends ConsumerWidget {
   }
 }
 
-class _CenterSpinner extends StatelessWidget {
-  const _CenterSpinner();
+class _SupportListSkeleton extends StatelessWidget {
+  const _SupportListSkeleton();
+
   @override
-  Widget build(BuildContext context) => const Padding(
-    padding: EdgeInsets.symmetric(vertical: 48),
-    child: Center(
-      child: SizedBox(
-        width: 22,
-        height: 22,
-        child: CircularProgressIndicator(
-          strokeWidth: 2.4,
-          color: AppColors.primary,
-        ),
-      ),
+  Widget build(BuildContext context) => const Shimmer(
+    child: Column(
+      children: [
+        _SupportSkeletonCard(),
+        SizedBox(height: 8),
+        _SupportSkeletonCard(),
+        SizedBox(height: 8),
+        _SupportSkeletonCard(),
+        SizedBox(height: 8),
+        _SupportSkeletonCard(),
+      ],
+    ),
+  );
+}
+
+class _SupportSkeletonCard extends StatelessWidget {
+  const _SupportSkeletonCard();
+
+  @override
+  Widget build(BuildContext context) => const GlassCard(
+    borderRadius: AppRadius.lg,
+    padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ShimmerBox(width: double.infinity, height: 15, radius: AppRadius.sm),
+        SizedBox(height: 10),
+        ShimmerBox(width: 220, height: 12, radius: AppRadius.sm),
+        SizedBox(height: 8),
+        ShimmerBox(width: 140, height: 12, radius: AppRadius.sm),
+      ],
     ),
   );
 }

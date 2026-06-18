@@ -14,6 +14,7 @@ import 'package:sejong_smart_campus/shared/widgets/glass_card.dart';
 import 'package:sejong_smart_campus/shared/widgets/mesh_background.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_refresh.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_sub_app_bar.dart';
+import 'package:sejong_smart_campus/shared/widgets/shimmer.dart';
 
 // ── 강의실 예약 유형코드
 const _kClassroomTypeCd = 'GAI008001';
@@ -45,13 +46,30 @@ class _SjptScreenState extends ConsumerState<SjptScreen>
     ref.invalidate(sjptInitProvider);
     ref.invalidate(sjptFacilitiesProvider);
     ref.invalidate(facilityImagesProvider);
-    await Future<void>.delayed(const Duration(milliseconds: 400));
+    try {
+      await Future.wait([
+        Future<void>.delayed(const Duration(milliseconds: 300)),
+        ref.read(sjptInitProvider.future).then((_) {}),
+        ref.read(sjptFacilitiesProvider.future).then((_) {}),
+        ref.read(facilityImagesProvider.future).then((_) {}),
+      ]);
+    } catch (_) {
+      // 오류 표시는 provider error UI에 맡기고 refresh indicator만 닫는다.
+    }
   }
 
   Future<void> _onRefreshReservations() async {
     ref.invalidate(sjptMyReservationsProvider);
     ref.invalidate(sjptLocalReservationsProvider);
-    await Future<void>.delayed(const Duration(milliseconds: 400));
+    try {
+      await Future.wait([
+        Future<void>.delayed(const Duration(milliseconds: 300)),
+        ref.read(sjptMyReservationsProvider.future).then((_) {}),
+        ref.read(sjptLocalReservationsProvider.future).then((_) {}),
+      ]);
+    } catch (_) {
+      // 서버 실패 시 로컬 fallback/error UI가 화면에서 처리한다.
+    }
   }
 
   @override
@@ -228,11 +246,11 @@ class _MyReservationsTab extends ConsumerWidget {
         data: (reservations) => reservations.isEmpty
             ? _buildEmpty(mq)
             : _buildServerList(mq, reservations, onRefresh),
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => _buildLoading(mq),
         error: (e, _) => localAsync.when(
           data: (locals) =>
               locals.isEmpty ? _buildEmpty(mq) : _buildLocalList(mq, locals),
-          loading: () => const Center(child: CircularProgressIndicator()),
+          loading: () => _buildLoading(mq),
           error: (err, st) => Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
@@ -248,6 +266,21 @@ class _MyReservationsTab extends ConsumerWidget {
       ),
     );
   }
+
+  Widget _buildLoading(MediaQueryData mq) => ListView.separated(
+    padding: EdgeInsets.fromLTRB(
+      AppSpacing.marginMobile,
+      12,
+      AppSpacing.marginMobile,
+      112 + mq.padding.bottom,
+    ),
+    physics: const AlwaysScrollableScrollPhysics(
+      parent: BouncingScrollPhysics(),
+    ),
+    itemCount: 4,
+    separatorBuilder: (context, i) => const SizedBox(height: 8),
+    itemBuilder: (context, i) => const _ReservationSkeletonCard(),
+  );
 
   Widget _buildEmpty(MediaQueryData mq) => ListView(
     padding: EdgeInsets.fromLTRB(
@@ -3075,9 +3108,77 @@ class _LoadingState extends StatelessWidget {
   const _LoadingState();
 
   @override
-  Widget build(BuildContext context) => const Padding(
-    padding: EdgeInsets.symmetric(vertical: 40),
-    child: Center(child: CircularProgressIndicator()),
+  Widget build(BuildContext context) => const Shimmer(
+    child: Column(
+      children: [
+        _FacilitySkeletonCard(),
+        SizedBox(height: 10),
+        _FacilitySkeletonCard(),
+        SizedBox(height: 10),
+        _FacilitySkeletonCard(),
+      ],
+    ),
+  );
+}
+
+class _FacilitySkeletonCard extends StatelessWidget {
+  const _FacilitySkeletonCard();
+
+  @override
+  Widget build(BuildContext context) => GlassCard(
+    borderRadius: AppRadius.xl,
+    padding: const EdgeInsets.all(16),
+    child: const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ShimmerBox(width: double.infinity, height: 116, radius: AppRadius.lg),
+        SizedBox(height: 14),
+        ShimmerBox(width: 180, height: 16, radius: AppRadius.sm),
+        SizedBox(height: 8),
+        ShimmerBox(width: 120, height: 12, radius: AppRadius.sm),
+        SizedBox(height: 12),
+        Row(
+          children: [
+            ShimmerBox(width: 74, height: 28, radius: AppRadius.full),
+            SizedBox(width: 8),
+            ShimmerBox(width: 92, height: 28, radius: AppRadius.full),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+class _ReservationSkeletonCard extends StatelessWidget {
+  const _ReservationSkeletonCard();
+
+  @override
+  Widget build(BuildContext context) => const Shimmer(
+    child: GlassCard(
+      borderRadius: AppRadius.lg,
+      padding: EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: ShimmerBox(height: 16, radius: AppRadius.sm)),
+              SizedBox(width: 12),
+              ShimmerBox(width: 72, height: 24, radius: AppRadius.full),
+            ],
+          ),
+          SizedBox(height: 12),
+          ShimmerBox(width: 150, height: 12, radius: AppRadius.sm),
+          SizedBox(height: 8),
+          ShimmerBox(width: 220, height: 12, radius: AppRadius.sm),
+          SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: ShimmerBox(width: 84, height: 28, radius: AppRadius.full),
+          ),
+        ],
+      ),
+    ),
   );
 }
 

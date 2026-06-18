@@ -34,13 +34,28 @@ class _CafeteriaScreenState extends ConsumerState<CafeteriaScreen> {
   Future<void> _onRefresh() async {
     ref.invalidate(buildingsProvider);
     final buildingId = ref.read(selectedBuildingIdProvider);
+    final futures = <Future<void>>[
+      Future<void>.delayed(const Duration(milliseconds: 300)),
+      ref.read(buildingsProvider.future).then((_) {}),
+    ];
     if (buildingId != null && buildingId != happydormVirtualBuildingId) {
       ref.invalidate(placesForBuildingProvider(buildingId));
+      futures.add(
+        ref.read(placesForBuildingProvider(buildingId).future).then((_) {}),
+      );
     }
     // 행복기숙사 — 현재 보고 있는 주의 식단만 새로고침.
     final date = ref.read(selectedDateProvider);
-    ref.invalidate(happydormWeeklyMenuProvider(mondayOfWeek(date)));
-    await Future<void>.delayed(const Duration(milliseconds: 400));
+    final weekKey = mondayOfWeek(date);
+    ref.invalidate(happydormWeeklyMenuProvider(weekKey));
+    futures.add(
+      ref.read(happydormWeeklyMenuProvider(weekKey).future).then((_) {}),
+    );
+    try {
+      await Future.wait(futures);
+    } catch (_) {
+      // Refresh indicator는 실제 요청 종료 후 닫고, 오류 표시는 각 provider UI에 맡긴다.
+    }
   }
 
   /// 첫 진입 시 preference 가 null 이면 온보딩 다이얼로그 표시 (세션당 1회).

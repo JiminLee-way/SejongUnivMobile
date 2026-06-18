@@ -8,6 +8,7 @@ import 'package:sejong_smart_campus/features/study_room/presentation/providers/s
 import 'package:sejong_smart_campus/shared/widgets/glass_card.dart';
 import 'package:sejong_smart_campus/shared/widgets/mesh_background.dart';
 import 'package:sejong_smart_campus/shared/widgets/sejong_refresh.dart';
+import 'package:sejong_smart_campus/shared/widgets/shimmer.dart';
 
 enum StudyRoomTab { status, reservations }
 
@@ -22,12 +23,24 @@ class _StudyRoomScreenState extends ConsumerState<StudyRoomScreen> {
   late StudyRoomTab _tab = widget.initial;
 
   Future<void> _onRefresh() async {
-    if (_tab == StudyRoomTab.status) {
-      ref.invalidate(studyRoomStatusProvider);
-    } else {
-      ref.invalidate(myStudyRoomReservationsProvider);
+    final activeTab = _tab;
+    try {
+      if (activeTab == StudyRoomTab.status) {
+        ref.invalidate(studyRoomStatusProvider);
+        await Future.wait([
+          Future<void>.delayed(const Duration(milliseconds: 300)),
+          ref.read(studyRoomStatusProvider.future).then((_) {}),
+        ]);
+      } else {
+        ref.invalidate(myStudyRoomReservationsProvider);
+        await Future.wait([
+          Future<void>.delayed(const Duration(milliseconds: 300)),
+          ref.read(myStudyRoomReservationsProvider.future).then((_) {}),
+        ]);
+      }
+    } catch (_) {
+      // 실패 메시지는 각 탭의 provider error UI가 렌더한다.
     }
-    await Future<void>.delayed(const Duration(milliseconds: 400));
   }
 
   @override
@@ -169,7 +182,7 @@ class _StatusBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(studyRoomStatusProvider);
     return async.when(
-      loading: () => const _CenterSpinner(),
+      loading: () => const _StudyRoomSkeleton(showSummary: true),
       error: (_, _) => const _EmptyBox(text: '스터디룸 현황을 불러오지 못했어요'),
       data: (rooms) {
         if (rooms.isEmpty) {
@@ -319,7 +332,7 @@ class _ReservationsBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(myStudyRoomReservationsProvider);
     return async.when(
-      loading: () => const _CenterSpinner(),
+      loading: () => const _StudyRoomSkeleton(showSummary: false),
       error: (_, _) => const _EmptyBox(text: '예약 내역을 불러오지 못했어요'),
       data: (list) {
         if (list.isEmpty) {
@@ -394,20 +407,56 @@ class _ReservationsBody extends ConsumerWidget {
   }
 }
 
-class _CenterSpinner extends StatelessWidget {
-  const _CenterSpinner();
+class _StudyRoomSkeleton extends StatelessWidget {
+  const _StudyRoomSkeleton({required this.showSummary});
+
+  final bool showSummary;
+
   @override
-  Widget build(BuildContext context) => const Padding(
-    padding: EdgeInsets.symmetric(vertical: 48),
-    child: Center(
-      child: SizedBox(
-        width: 22,
-        height: 22,
-        child: CircularProgressIndicator(
-          strokeWidth: 2.4,
-          color: AppColors.primary,
-        ),
-      ),
+  Widget build(BuildContext context) => Shimmer(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showSummary) ...[
+          const GlassCard(
+            borderRadius: AppRadius.xl,
+            padding: EdgeInsets.fromLTRB(20, 14, 20, 14),
+            child: Row(
+              children: [
+                ShimmerBox(width: 24, height: 24, radius: AppRadius.full),
+                SizedBox(width: 10),
+                ShimmerBox(width: 150, height: 18, radius: AppRadius.sm),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        for (var i = 0; i < 4; i++) ...[
+          const GlassCard(
+            borderRadius: AppRadius.lg,
+            padding: EdgeInsets.fromLTRB(14, 12, 14, 12),
+            child: Row(
+              children: [
+                ShimmerBox(width: 36, height: 36, radius: AppRadius.full),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ShimmerBox(width: 150, height: 14, radius: AppRadius.sm),
+                      SizedBox(height: 8),
+                      ShimmerBox(height: 8, radius: AppRadius.full),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 12),
+                ShimmerBox(width: 48, height: 24, radius: AppRadius.full),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ],
     ),
   );
 }
