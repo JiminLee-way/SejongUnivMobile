@@ -180,6 +180,9 @@ class _BuildingsStrip extends ConsumerStatefulWidget {
 }
 
 class _BuildingsStripState extends ConsumerState<_BuildingsStrip> {
+  bool _userSelectedBuilding = false;
+  CafeteriaPreference? _lastSeenPreference;
+
   /// 군자관 → 행복기숙사 → 진관홀 → 학생회관 순서.
   /// sjapp이 주는 building 목록(보통 군자관·진관홀·학생회관)에 행복기숙사를
   /// 가상 항목으로 끼워넣되, "군자관" 바로 뒤에 위치하도록 정렬한다.
@@ -208,7 +211,6 @@ class _BuildingsStripState extends ConsumerState<_BuildingsStrip> {
   ///   4) 평일 + buildings 도착 → 첫 sjapp 건물 (보통 군자관)
   void _autoSelectIfNeeded() {
     final cur = ref.read(selectedBuildingIdProvider);
-    if (cur != null) return;
     final merged = _withHappydorm(widget.buildings);
     if (merged.isEmpty) return;
 
@@ -218,25 +220,20 @@ class _BuildingsStripState extends ConsumerState<_BuildingsStrip> {
 
     // (1) preference 우선.
     final pref = prefAsync.value;
+    if (pref != _lastSeenPreference) {
+      _lastSeenPreference = pref;
+      _userSelectedBuilding = false;
+    }
     if (pref != null) {
-      if (pref == CafeteriaPreference.happydorm) {
-        ref.read(selectedBuildingIdProvider.notifier).value =
-            happydormVirtualBuildingId;
-        return;
+      if (_userSelectedBuilding) return;
+      final desiredId = _preferredBuildingId(pref);
+      if (cur != desiredId) {
+        ref.read(selectedBuildingIdProvider.notifier).value = desiredId;
       }
-      // 군자관 — sjapp buildings 도착 전이면 happydorm fallback (대기 안 함)
-      if (widget.buildings.isEmpty) {
-        ref.read(selectedBuildingIdProvider.notifier).value =
-            happydormVirtualBuildingId;
-        return;
-      }
-      final gunja = widget.buildings.firstWhere(
-        (b) => b.name.contains('군자관'),
-        orElse: () => widget.buildings.first,
-      );
-      ref.read(selectedBuildingIdProvider.notifier).value = gunja.id;
       return;
     }
+
+    if (cur != null) return;
 
     // (2~4) preference 없음 → 기존 휴리스틱.
     final today = ref.read(selectedDateProvider);
@@ -250,6 +247,28 @@ class _BuildingsStripState extends ConsumerState<_BuildingsStrip> {
         : merged.first.id;
   }
 
+  int _preferredBuildingId(CafeteriaPreference pref) {
+    switch (pref) {
+      case CafeteriaPreference.happydorm:
+        return happydormVirtualBuildingId;
+      case CafeteriaPreference.gunja:
+        // 군자관 — sjapp buildings 도착 전이면 happydorm fallback을 임시 표시.
+        // 이후 buildings가 도착하면 _userSelectedBuilding=false 상태에서 다시
+        // 호출되어 군자관 id로 교체된다.
+        if (widget.buildings.isEmpty) return happydormVirtualBuildingId;
+        final gunja = widget.buildings.firstWhere(
+          (b) => b.name.contains('군자관'),
+          orElse: () => widget.buildings.first,
+        );
+        return gunja.id;
+    }
+  }
+
+  void _selectBuilding(int id) {
+    _userSelectedBuilding = true;
+    ref.read(selectedBuildingIdProvider.notifier).value = id;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -259,8 +278,8 @@ class _BuildingsStripState extends ConsumerState<_BuildingsStrip> {
   @override
   void didUpdateWidget(covariant _BuildingsStrip oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // buildings 응답이 늦게 도착했을 때, 이미 happydorm fallback이 선택돼
-    // 있으면 그대로 둔다. 아직 선택이 없으면 새 목록 기준으로 재시도.
+    // buildings 응답이 늦게 도착하면 저장 선호 기준으로 다시 선택한다.
+    // 사용자가 직접 칩을 누른 경우에는 _autoSelectIfNeeded가 건드리지 않는다.
     if (oldWidget.buildings.length != widget.buildings.length) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _autoSelectIfNeeded(),
@@ -272,7 +291,7 @@ class _BuildingsStripState extends ConsumerState<_BuildingsStrip> {
   Widget build(BuildContext context) {
     final selectedId = ref.watch(selectedBuildingIdProvider);
     // preference 가 늦게 도착할 수 있어 build 마다 watch + auto-select 재시도.
-    // 한 번 selectedBuildingId 가 잡히면 _autoSelectIfNeeded 가 no-op.
+    // 사용자가 직접 칩을 누르기 전까지는 저장 선호가 우선한다.
     ref.watch(cafeteriaPreferenceProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) => _autoSelectIfNeeded());
     final merged = _withHappydorm(widget.buildings);
@@ -302,8 +321,7 @@ class _BuildingsStripState extends ConsumerState<_BuildingsStrip> {
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               borderRadius: BorderRadius.circular(AppRadius.full),
-              onTap: () =>
-                  ref.read(selectedBuildingIdProvider.notifier).value = b.id,
+              onTap: () => _selectBuilding(b.id),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
                 padding: const EdgeInsets.symmetric(
