@@ -4,7 +4,7 @@ import 'package:sejong_smart_campus/features/academic/data/datasources/sejong_ac
 import 'package:sejong_smart_campus/features/academic/domain/entities/academic_models.dart';
 import 'package:sejong_smart_campus/features/auth/presentation/providers/auth_providers.dart';
 
-final _academicRemoteProvider = FutureProvider<SejongAcademicRemote>((
+final academicRemoteProvider = FutureProvider<SejongAcademicRemote>((
   ref,
 ) async {
   final client = await ref.watch(sejongApiClientProvider.future);
@@ -89,7 +89,7 @@ final officialAcademicCalendarProvider = FutureProvider.autoDispose
       ref,
       query,
     ) async {
-      final remote = await ref.watch(_academicRemoteProvider.future);
+      final remote = await ref.watch(academicRemoteProvider.future);
       final category = AcademicCalendarCategory.byCode(query.categoryCode);
       final AcademicCalendarRange range;
       if (query.mode == AcademicCalendarMode.month) {
@@ -143,20 +143,28 @@ final calendarMonthProvider = NotifierProvider<CalendarMonthNotifier, DateTime>(
 
 final dailyCalendarProvider = FutureProvider.autoDispose
     .family<List<CalendarItem>, DateTime>((ref, date) async {
-      final remote = await ref.watch(_academicRemoteProvider.future);
+      final remote = await ref.watch(academicRemoteProvider.future);
       return remote.fetchDailyCalendar(_yyyymmdd(date));
     });
 
 final studentDailyAllProvider = FutureProvider.autoDispose
     .family<List<CalendarItem>, DateTime>((ref, date) async {
-      final remote = await ref.watch(_academicRemoteProvider.future);
+      final remote = await ref.watch(academicRemoteProvider.future);
       return remote.fetchStudentDailyAll(_yyyymmdd(date));
     });
 
 final gradesProvider = FutureProvider<GradeInquiry>((ref) async {
   ref.watch(currentUserProvider);
-  final remote = await ref.watch(_academicRemoteProvider.future);
+  final remote = await ref.watch(academicRemoteProvider.future);
   return remote.fetchGrades();
+});
+
+final currentSemesterGradeProvider = FutureProvider<GradeSelectedSemester>((
+  ref,
+) async {
+  ref.watch(currentUserProvider);
+  final remote = await ref.watch(academicRemoteProvider.future);
+  return remote.fetchCurrentSemesterGrade();
 });
 
 /// 성적 화면에서 사용자가 선택한 학기 키. `null` = `/grade-inquiry/all`의
@@ -184,7 +192,7 @@ final gradeSemesterProvider = FutureProvider.autoDispose
       key,
     ) async {
       ref.watch(currentUserProvider);
-      final remote = await ref.watch(_academicRemoteProvider.future);
+      final remote = await ref.watch(academicRemoteProvider.future);
       return remote.fetchGradeSemester(key.year, key.smtCd);
     });
 
@@ -194,7 +202,7 @@ final gradeSemesterProvider = FutureProvider.autoDispose
 /// 되므로 autoDispose.
 final monthlyMarksProvider = FutureProvider.autoDispose
     .family<MonthlyMarks, ({int year, int month})>((ref, key) async {
-      final remote = await ref.watch(_academicRemoteProvider.future);
+      final remote = await ref.watch(academicRemoteProvider.future);
       try {
         return await remote.fetchMonthlyMarks(key.year, key.month);
       } catch (_) {
@@ -205,7 +213,7 @@ final monthlyMarksProvider = FutureProvider.autoDispose
 final organizationTypesProvider = FutureProvider<List<OrganizationType>>((
   ref,
 ) async {
-  final remote = await ref.watch(_academicRemoteProvider.future);
+  final remote = await ref.watch(academicRemoteProvider.future);
   try {
     return await remote.fetchOrganizationTypes();
   } catch (_) {

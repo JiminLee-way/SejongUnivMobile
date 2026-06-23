@@ -89,6 +89,8 @@ class SejongEndpoints {
   // 성적·일정
   static const String gradeInquiryAll =
       '${SejongPrefix.secureApi}/grade-inquiry/all';
+  static const String gradeInquiryCurrent =
+      '${SejongPrefix.secureApi}/grade-inquiry/current';
 
   /// 특정 학기 성적 — `data` 는 `GradeSelectedSemester` 모양.
   static String gradeInquirySemester(String year, String smtCd) =>

@@ -19,6 +19,10 @@ void main() {
           screen: 'AcademicCalendarScreen',
         ),
         (marker: "case 'aca.classSchedule':", screen: 'TimetableScreen'),
+        (
+          marker: "case 'client.gradeCalculator':",
+          screen: 'GradeCalculatorScreen',
+        ),
         (marker: "case 'client.libraryFloors':", screen: 'LibraryListScreen'),
         (marker: "case 'client.libseat':", screen: 'LibseatScreen'),
         (marker: "key == 'client.sjpt'", screen: 'SjptScreen'),
@@ -66,5 +70,27 @@ void main() {
         expect(routeHelper, contains('_switchTab(context, 1);'));
       },
     );
+
+    test('grade inquiry keys route to distinct native screens', () {
+      expect(
+        routeHelper,
+        contains("case 'aca.gradeInquiry':\n      push(const GradesScreen());"),
+      );
+      expect(
+        routeHelper,
+        contains(
+          "case 'aca.currentSemesterGrade':\n"
+          '      push(const CurrentSemesterGradeScreen());',
+        ),
+      );
+      expect(
+        routeHelper,
+        isNot(
+          contains(
+            "case 'aca.gradeInquiry':\n    case 'aca.currentSemesterGrade':",
+          ),
+        ),
+      );
+    });
   });
 }

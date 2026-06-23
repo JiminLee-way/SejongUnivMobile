@@ -136,8 +136,80 @@ class GradesScreen extends ConsumerWidget {
   }
 }
 
+class CurrentSemesterGradeScreen extends ConsumerWidget {
+  const CurrentSemesterGradeScreen({super.key});
+
+  Future<void> _onRefresh(WidgetRef ref) async {
+    try {
+      ref.invalidate(currentSemesterGradeProvider);
+      await Future.wait([
+        Future<void>.delayed(const Duration(milliseconds: 300)),
+        ref.read(currentSemesterGradeProvider.future).then((_) {}),
+      ]);
+    } catch (_) {
+      // 실패는 provider error UI가 렌더한다.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mq = MediaQuery.of(context);
+    final async = ref.watch(currentSemesterGradeProvider);
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      extendBodyBehindAppBar: true,
+      body: MeshBackground(
+        child: Stack(
+          children: [
+            SafeArea(
+              top: false,
+              child: SejongRefresh(
+                onRefresh: () => _onRefresh(ref),
+                topInset: mq.padding.top + 64,
+                child: async.when(
+                  loading: () => _CurrentGradePageSkeleton(
+                    topPadding: mq.padding.top + 64 + 16,
+                    bottomPadding: 120 + mq.padding.bottom,
+                  ),
+                  error: (_, _) => Center(
+                    child: Text(
+                      '당해학기 성적을 불러오지 못했어요',
+                      style: AppTypography.labelMd.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  data: (semester) => ListView(
+                    padding: EdgeInsets.only(
+                      top: mq.padding.top + 64 + 16,
+                      left: AppSpacing.marginMobile,
+                      right: AppSpacing.marginMobile,
+                      bottom: 120 + mq.padding.bottom,
+                    ),
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics(),
+                    ),
+                    children: [_SelectedSemesterCard(sel: semester)],
+                  ),
+                ),
+              ),
+            ),
+            const Align(
+              alignment: Alignment.topCenter,
+              child: _AppBar(title: '당해학기 성적'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _AppBar extends StatelessWidget {
-  const _AppBar();
+  const _AppBar({this.title = '성적'});
+
+  final String title;
+
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
@@ -157,7 +229,7 @@ class _AppBar extends StatelessWidget {
             onPressed: () => Navigator.of(context).maybePop(),
           ),
           Text(
-            '성적',
+            title,
             style: AppTypography.headlineMd.copyWith(
               fontSize: 18,
               fontWeight: FontWeight.w700,
@@ -466,64 +538,78 @@ class _SemesterCard extends StatelessWidget {
                 ],
               ),
               const Spacer(),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(
-                    s.avgMrks.toStringAsFixed(2),
-                    style: AppTypography.labelMd.copyWith(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.onSurface,
-                      height: 1.0,
-                    ),
+              SizedBox(
+                width: double.infinity,
+                child: FittedBox(
+                  alignment: Alignment.centerLeft,
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        s.avgMrks.toStringAsFixed(2),
+                        style: AppTypography.labelMd.copyWith(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.onSurface,
+                          height: 1.0,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '/ 4.5',
+                        style: AppTypography.labelSm.copyWith(
+                          fontSize: 10,
+                          color: AppColors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '/ 4.5',
-                    style: AppTypography.labelSm.copyWith(
-                      fontSize: 10,
-                      color: AppColors.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+                ),
               ),
               const SizedBox(height: 4),
-              Row(
-                children: [
-                  const Icon(
-                    Symbols.menu_book,
-                    size: 12,
-                    color: AppColors.onSurfaceVariant,
+              SizedBox(
+                width: double.infinity,
+                child: FittedBox(
+                  alignment: Alignment.centerLeft,
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Symbols.menu_book,
+                        size: 12,
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${s.appCdt}/${s.reqCdt}학점',
+                        style: AppTypography.labelSm.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '·',
+                        style: AppTypography.labelSm.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${s.sco}점',
+                        style: AppTypography.labelSm.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 3),
-                  Text(
-                    '${s.appCdt}/${s.reqCdt}학점',
-                    style: AppTypography.labelSm.copyWith(
-                      color: AppColors.onSurfaceVariant,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '·',
-                    style: AppTypography.labelSm.copyWith(
-                      color: AppColors.onSurfaceVariant,
-                      fontSize: 11,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${s.sco}점',
-                    style: AppTypography.labelSm.copyWith(
-                      color: AppColors.onSurfaceVariant,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ],
           ),
@@ -661,6 +747,30 @@ class _GradesPageSkeleton extends StatelessWidget {
   );
 }
 
+class _CurrentGradePageSkeleton extends StatelessWidget {
+  const _CurrentGradePageSkeleton({
+    required this.topPadding,
+    required this.bottomPadding,
+  });
+
+  final double topPadding;
+  final double bottomPadding;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    padding: EdgeInsets.only(
+      top: topPadding,
+      left: AppSpacing.marginMobile,
+      right: AppSpacing.marginMobile,
+      bottom: bottomPadding,
+    ),
+    physics: const AlwaysScrollableScrollPhysics(
+      parent: BouncingScrollPhysics(),
+    ),
+    children: const [_GradeDetailSkeletonCard()],
+  );
+}
+
 class _GradeDetailSkeletonCard extends StatelessWidget {
   const _GradeDetailSkeletonCard();
 
@@ -726,6 +836,9 @@ class _SelectedSemesterCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final totalCdt = sel.courses.fold<int>(0, (a, c) => a + c.cdt);
+    final semesterTitle = sel.smtCdNm.trim().isEmpty
+        ? '${sel.year}년'
+        : '${sel.year}년 ${sel.smtCdNm}';
     return GlassCard(
       borderRadius: AppRadius.xl,
       padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
@@ -735,7 +848,7 @@ class _SelectedSemesterCard extends StatelessWidget {
           Row(
             children: [
               Text(
-                sel.smtCdNm,
+                semesterTitle,
                 style: AppTypography.labelMd.copyWith(
                   fontWeight: FontWeight.w700,
                   fontSize: 15,
@@ -829,13 +942,19 @@ class _CourseRow extends StatelessWidget {
               border: Border.all(color: palette.fg.withValues(alpha: 0.35)),
             ),
             alignment: Alignment.center,
-            child: Text(
-              c.grade,
-              style: AppTypography.labelMd.copyWith(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                color: palette.fg,
-                letterSpacing: -0.2,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  c.grade,
+                  style: AppTypography.labelMd.copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: palette.fg,
+                    letterSpacing: 0,
+                  ),
+                ),
               ),
             ),
           ),
@@ -892,7 +1011,7 @@ class _CourseRow extends StatelessWidget {
             ),
           ),
           Text(
-            c.grade == 'P' || c.grade == 'NP' ? '—' : c.mrks.toStringAsFixed(1),
+            c.scoreLabel,
             style: AppTypography.labelMd.copyWith(
               color: AppColors.onSurfaceVariant,
               fontSize: 12.5,

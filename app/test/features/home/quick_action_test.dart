@@ -34,6 +34,10 @@ void main() {
       );
       final facilityRental = resolveQuickActionInfo('client.sjpt', const []);
       final uCheck = resolveQuickActionInfo('client.uCheckTab', const []);
+      final gradeCalculator = resolveQuickActionInfo(
+        'client.gradeCalculator',
+        const [],
+      );
 
       expect(academicCalendar.label, '학사캘린더');
       expect(studentId.label, '학생증');
@@ -42,6 +46,7 @@ void main() {
       expect(academicNotice.label, '학사공지');
       expect(facilityRental.label, '학교시설대여');
       expect(uCheck.label, 'U-Check');
+      expect(gradeCalculator.label, '학점계산기');
     });
 
     test('saved club shortcut is migrated to school facility rental', () {

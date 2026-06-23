@@ -46,6 +46,9 @@ const String _petitionItemId = 'client-petition';
 /// 집현캠퍼스 클라이언트 가상 항목 itemId.
 const String _jiphyunCampusItemId = 'client-jiphyun-campus';
 
+/// 학점계산기 클라이언트 가상 항목 itemId.
+const String _gradeCalculatorItemId = 'client-grade-calculator';
+
 /// "지원" 단일 leaf 가상 항목 itemId (sjapp 트리의 "지원 서비스" GROUP을 대체).
 const String _supportItemId = 'client-support';
 
@@ -131,9 +134,10 @@ List<SejongMenuItem> customizeMenuTree(List<SejongMenuItem> raw) {
       ];
       out.add(g.copyWith(children: _stripHiddenLeaves(children)));
     } else if (_isSmartAcademicsGroup(g)) {
-      // 스마트학사 그룹에 집현캠퍼스 가상 항목 append.
+      // 스마트학사 그룹에 학점계산기 + 집현캠퍼스 가상 항목 append.
       final children = [
         ...(g.children ?? const <SejongMenuItem>[]),
+        _buildGradeCalculatorItem(),
         _buildJiphyunCampusItem(),
       ];
       out.add(g.copyWith(children: _stripHiddenLeaves(children)));
@@ -340,6 +344,31 @@ SejongMenuItem _buildLibraryFloorsItem() {
     visible: true,
     allowedRoles: const ['STUDENT'],
     itemKey: 'client.libraryFloors',
+    children: null,
+  );
+}
+
+/// 학점계산기 가상 leaf — 성적 조회와 분리된 로컬 예측 화면으로 라우팅.
+SejongMenuItem _buildGradeCalculatorItem() {
+  return SejongMenuItem(
+    itemId: _gradeCalculatorItemId,
+    menuId: 'STUDENT_MAIN',
+    itemName: '학점계산기',
+    itemType: 'PAGE',
+    parentItemId: null,
+    itemLevel: 1,
+    displayOrder: 998,
+    url: 'client.gradeCalculator',
+    webUrl: '',
+    target: '_self',
+    iconClass: 'Calculator',
+    callType: 'NONE',
+    callParams: null,
+    appScheme: null,
+    active: true,
+    visible: true,
+    allowedRoles: const ['STUDENT'],
+    itemKey: 'client.gradeCalculator',
     children: null,
   );
 }

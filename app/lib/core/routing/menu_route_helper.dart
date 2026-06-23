@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:sejong_smart_campus/core/network/service_urls.dart';
 import 'package:sejong_smart_campus/core/routing/app_page_route.dart';
 import 'package:sejong_smart_campus/shared/widgets/app_toast.dart';
+import 'package:sejong_smart_campus/features/academic/presentation/screens/grade_calculator_screen.dart';
 import 'package:sejong_smart_campus/features/academic/presentation/screens/grades_screen.dart';
 import 'package:sejong_smart_campus/features/academic/presentation/screens/academic_calendar_screen.dart';
 import 'package:sejong_smart_campus/features/cafeteria/presentation/screens/cafeteria_screen.dart';
@@ -84,8 +85,13 @@ bool routeByKey(
       push(const AcademicCalendarScreen());
       return true;
     case 'aca.gradeInquiry':
-    case 'aca.currentSemesterGrade':
       push(const GradesScreen());
+      return true;
+    case 'aca.currentSemesterGrade':
+      push(const CurrentSemesterGradeScreen());
+      return true;
+    case 'client.gradeCalculator':
+      push(const GradeCalculatorScreen());
       return true;
     case 'aca.scholarshipStatus':
       push(const FinanceScreen(initial: FinanceTab.scholarship));

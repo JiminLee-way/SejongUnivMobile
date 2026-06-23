@@ -110,6 +110,18 @@ class SejongAcademicRemote {
     );
   }
 
+  /// 당해학기 성적. `data`는 특정 학기 상세와 같은 모양이다.
+  Future<GradeSelectedSemester> fetchCurrentSemesterGrade() async {
+    final res = await client.dio.get<dynamic>(
+      SejongEndpoints.gradeInquiryCurrent,
+    );
+    return client.unwrap<GradeSelectedSemester>(
+      res,
+      (raw) =>
+          GradeSelectedSemester.fromJson((raw as Map).cast<String, dynamic>()),
+    );
+  }
+
   /// 특정 학기 성적 (과목 list 포함). 학기 chip 탭마다 호출.
   Future<GradeSelectedSemester> fetchGradeSemester(
     String year,

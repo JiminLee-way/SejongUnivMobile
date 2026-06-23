@@ -20,6 +20,7 @@ const _kLucideToSymbols = <String, IconData>{
   'CalendarCheck': Symbols.event_available,
   'CalendarDays': Symbols.date_range,
   'Campaign': Symbols.campaign,
+  'Calculator': Symbols.calculate,
   'ChartColumn': Symbols.bar_chart,
   'CircleDollarSign': Symbols.paid,
   'ClipboardList': Symbols.assignment,

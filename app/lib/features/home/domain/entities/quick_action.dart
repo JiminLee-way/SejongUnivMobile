@@ -123,6 +123,10 @@ const kQuickActionRegistry = <String, QuickActionInfo>{
   'inf.notice.general': QuickActionInfo(label: '일반공지', icon: Symbols.article),
   'inf.notice.academic': QuickActionInfo(label: '학사공지', icon: Symbols.school),
   'aca.gradeInquiry': QuickActionInfo(label: '성적', icon: Symbols.grade),
+  'client.gradeCalculator': QuickActionInfo(
+    label: '학점계산기',
+    icon: Symbols.calculate,
+  ),
   'aca.scholarshipStatus': QuickActionInfo(label: '장학금', icon: Symbols.school),
   'aca.tuitionDetails': QuickActionInfo(label: '등록금', icon: Symbols.payments),
   'svc.studyRoomStatus': QuickActionInfo(

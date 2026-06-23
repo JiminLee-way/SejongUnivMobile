@@ -365,16 +365,28 @@ class GradeCourseRecord {
   final int cdt;
   final String curiTypeCdNm;
   final String grade;
-  final double mrks;
+  final double? mrks;
   final String? reInfo;
 
+  String get scoreLabel {
+    final normalizedGrade = grade.trim();
+    if (normalizedGrade == 'P' ||
+        normalizedGrade == 'NP' ||
+        normalizedGrade == '교수미게시' ||
+        mrks == null) {
+      return '-';
+    }
+    return mrks!.toStringAsFixed(1);
+  }
+
   factory GradeCourseRecord.fromJson(Map<String, dynamic> json) {
+    final rawMrks = json['mrks'];
     return GradeCourseRecord(
       curiNm: (json['curiNm'] ?? '').toString(),
       cdt: ((json['cdt'] as num?) ?? 0).toInt(),
       curiTypeCdNm: (json['curiTypeCdNm'] ?? '').toString(),
       grade: (json['grade'] ?? '').toString(),
-      mrks: ((json['mrks'] as num?) ?? 0).toDouble(),
+      mrks: rawMrks is num ? rawMrks.toDouble() : null,
       reInfo: json['reInfo'] as String?,
     );
   }
