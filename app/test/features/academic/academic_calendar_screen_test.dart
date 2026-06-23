@@ -149,6 +149,9 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
 
+        await tester.tap(find.text('14'));
+        await tester.pumpAndSettle();
+
         const overlayKey = ValueKey(
           'academic-calendar-selected-day-overlay-positioned',
         );
